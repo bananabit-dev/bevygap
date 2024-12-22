@@ -46,14 +46,16 @@ bevy_nfws = { path = "./bevy_nfws", version = "0.1.0" }
 
 # YOU MUST USE SAME LY VER AS GAME
 # Otherwise resources from lightyear won't be found.
-# TODO: this will soon change to a normal crates.io dep
-lightyear = { version = "0.17", git = "https://github.com/cBournhonesque/lightyear.git", rev = "5845699d02ee953b73fa6f341224fe0df9dfa12b", default-features = false, features = [
+lightyear = { version = "0.18", default-features = false, features = [
   "webtransport",
 ] }
 
-bevy = { version = "0.14", default-features = false }
-bevy-tokio-tasks = "0.14"
-bevy_async_task = "0.2"
+bevy = { version = "0.15", default-features = false }
+# No 0.15 version yet, PR open:
+#bevy-tokio-tasks = "0.14"
+bevy-tokio-tasks = {git = "https://github.com/foxzool/bevy-tokio-tasks.git", rev = "8620ec1e836445f249b63c8d313f7448792364cd"}
+
+bevy_async_task = "0.4"
 rand = "*"
 axum = { version = "0.7.7", features = ["ws"] }
 anyhow = "1.0"

@@ -17,6 +17,6 @@ pub trait BevygapConnectExt {
 
 impl<'w, 's> BevygapConnectExt for Commands<'w, 's> {
     fn bevygap_connect_client(&mut self) {
-        self.add(BevygapConnectCommand);
+        self.queue(BevygapConnectCommand);
     }
 }

@@ -39,6 +39,7 @@ impl Plugin for BevygapServerPlugin {
         // When using a self-signed cert for your NATS server, the server needs the root CA .pem file
         // in order to verify the server's certificate. Since this file is around 2kB, and Edgegap
         // limits you to 255 bytes in ENV vars, we set this from a command line arg instead.
+        // (Edgegap have a bug report in the backlog to increase this limit)
         //
         // If present, we write the contents to an ENV var, which is later read by setup_nats().
         // In future, we hope to just set this ENV var directly in the Edgegap Dashboard.
@@ -46,12 +47,12 @@ impl Plugin for BevygapServerPlugin {
 
         app.add_systems(Startup, (extract_cert_digest, setup_nats).chain());
 
-        app.observe(edgegap_context::fetch_context_on_nats_connected);
-        app.observe(send_context_to_nats);
-        app.observe(setup_connection_request_handler);
+        app.add_observer(edgegap_context::fetch_context_on_nats_connected);
+        app.add_observer(send_context_to_nats);
+        app.add_observer(setup_connection_request_handler);
 
-        app.observe(handle_lightyear_client_connect);
-        app.observe(handle_lightyear_client_disconnect);
+        app.add_observer(handle_lightyear_client_connect);
+        app.add_observer(handle_lightyear_client_disconnect);
     }
 }
 
@@ -249,7 +250,7 @@ fn setup_nats(runtime: ResMut<TokioTasksRuntime>, mut commands: Commands) {
             // instead of:
             // ctx.world.trigger(NatsConnected);
             // we do:
-            ctx.world.commands().push(DeferredTriggerCommand(NatsConnected));
+            ctx.world.commands().queue(DeferredTriggerCommand(NatsConnected));
             // so the actual triggering happens after the TokioTasksRuntime resource is reinserted into the world.
         })
         .await;

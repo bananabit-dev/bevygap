@@ -12,7 +12,7 @@ pub struct NfwsPlugin;
 
 impl Plugin for NfwsPlugin {
     fn build(&self, app: &mut App) {
-        app.observe(start_new_ws_tasks);
+        app.add_observer(start_new_ws_tasks);
     }
 }
 
