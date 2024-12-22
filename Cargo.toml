@@ -12,7 +12,7 @@ resolver = "2"
 
 
 [workspace.package]
-version = "0.2.3"
+version = "0.3.0"
 authors = ["RJ <rj@metabrew.com>"]
 homepage = "https://github.com/RJ/bevygap"
 publish = false
@@ -40,9 +40,9 @@ incremental = false
 debug = false
 
 [workspace.dependencies]
-bevygap_shared = { path = "./bevygap_shared", default-features = false, version = "0.2.3" }
+bevygap_shared = { path = "./bevygap_shared", default-features = false, version = "0.3.0" }
 edgegap_async = { path = "./edgegap_async", version = "0.1.0" }
-bevy_nfws = { path = "./bevy_nfws", version = "0.1.0" }
+bevy_nfws = { path = "./bevy_nfws", version = "0.3.0" }
 
 # YOU MUST USE SAME LY VER AS GAME
 # Otherwise resources from lightyear won't be found.

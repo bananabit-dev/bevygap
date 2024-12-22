@@ -11,6 +11,11 @@
 use crate::models;
 use serde::{Deserialize, Serialize};
 
+// https://github.com/serde-rs/serde/issues/1030
+fn default_false() -> bool {
+    false
+}
+
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Deployment {
     /// Unique UUID
@@ -27,8 +32,9 @@ pub struct Deployment {
     pub ready: bool,
     /// if the deployment ACL is active
     #[serde(rename = "whitelisting_active")]
+    #[serde(default = "default_false")]
     pub whitelisting_active: bool,
-    /// 
+    ///
     #[serde(rename = "fqdn")]
     pub fqdn: String,
     #[serde(rename = "ports", skip_serializing_if = "Option::is_none")]
@@ -45,12 +51,22 @@ pub struct Deployment {
     #[serde(rename = "sockets_usage", skip_serializing_if = "Option::is_none")]
     pub sockets_usage: Option<i32>,
     /// If the deployment is joinable by sessions
-    #[serde(rename = "is_joinable_by_session", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "is_joinable_by_session",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub is_joinable_by_session: Option<bool>,
 }
 
 impl Deployment {
-    pub fn new(request_id: String, public_ip: String, status: String, ready: bool, whitelisting_active: bool, fqdn: String) -> Deployment {
+    pub fn new(
+        request_id: String,
+        public_ip: String,
+        status: String,
+        ready: bool,
+        whitelisting_active: bool,
+        fqdn: String,
+    ) -> Deployment {
         Deployment {
             request_id,
             public_ip,
@@ -67,4 +83,3 @@ impl Deployment {
         }
     }
 }
-
