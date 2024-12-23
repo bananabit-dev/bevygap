@@ -11,14 +11,16 @@ homepage.workspace = true
 [dependencies]
 bevygap_shared = { workspace = true, features = ["nats", "bevy"] }
 bevy.workspace = true
-bevy-tokio-tasks.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 url.workspace = true
 reqwest.workspace = true
 lightyear.workspace = true
 async-nats.workspace = true
-tokio.workspace = true
+# tokio.workspace = true
+# yoinked into a local src file for now due to no published version:
+#bevy-tokio-tasks.workspace = true
+tokio = { version = "1", features = ["rt", "sync", "full"] }
 
 
 [lints]

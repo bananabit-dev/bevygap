@@ -1,4 +1,5 @@
 mod arbitrium_env;
+mod bevy_tokio_tasks;
 mod edgegap_context;
 mod http_client;
 mod plugin;

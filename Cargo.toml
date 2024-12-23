@@ -12,7 +12,7 @@ resolver = "2"
 
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.1"
 authors = ["RJ <rj@metabrew.com>"]
 homepage = "https://github.com/RJ/bevygap"
 publish = false
@@ -40,9 +40,9 @@ incremental = false
 debug = false
 
 [workspace.dependencies]
-bevygap_shared = { path = "./bevygap_shared", default-features = false, version = "0.3.0" }
+bevygap_shared = { path = "./bevygap_shared", default-features = false, version = "0.3.1" }
 edgegap_async = { path = "./edgegap_async", version = "0.1.0" }
-bevy_nfws = { path = "./bevy_nfws", version = "0.3.0" }
+bevy_nfws = { path = "./bevy_nfws", version = "0.3.1" }
 
 # YOU MUST USE SAME LY VER AS GAME
 # Otherwise resources from lightyear won't be found.
@@ -51,9 +51,10 @@ lightyear = { version = "0.18", default-features = false, features = [
 ] }
 
 bevy = { version = "0.15", default-features = false }
-# No 0.15 version yet, PR open:
+
+# No 0.15 version yet, PR open. vendored the source file in server plugin for now.
 #bevy-tokio-tasks = "0.14"
-bevy-tokio-tasks = {git = "https://github.com/foxzool/bevy-tokio-tasks.git", rev = "8620ec1e836445f249b63c8d313f7448792364cd"}
+#bevy-tokio-tasks = {git = "https://github.com/foxzool/bevy-tokio-tasks.git", rev = "8620ec1e836445f249b63c8d313f7448792364cd"}
 
 bevy_async_task = "0.4"
 rand = "*"
@@ -67,6 +68,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 futures = "0.3"
 futures-util = { version = "0.3", features = ["sink"] }
+# TODO: minimise tokio features as needed:
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1.16"
 tokio-tungstenite = "0.23"

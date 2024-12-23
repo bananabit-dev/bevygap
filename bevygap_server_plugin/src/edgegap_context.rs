@@ -2,8 +2,8 @@
 /// information relevant to the deployment of this gameserver, such as its
 /// location, public IP, and other metadata.
 use crate::arbitrium_env::ArbitriumEnv;
+use crate::bevy_tokio_tasks::TokioTasksRuntime;
 use bevy::prelude::*;
-use bevy_tokio_tasks::TokioTasksRuntime;
 
 #[derive(Event)]
 pub(crate) struct ContextLoaded;
