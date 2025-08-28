@@ -46,7 +46,7 @@ bevy_nfws = { path = "./bevy_nfws", version = "0.3.1" }
 
 # YOU MUST USE SAME LY VER AS GAME
 # Otherwise resources from lightyear won't be found.
-lightyear = { version = "0.18", default-features = false, features = [
+lightyear = { git = "https://github.com/bananabit-dev/lightyear.git",  default-features = false, features = [
   "webtransport",
 ] }
 
