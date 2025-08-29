@@ -1,6 +1,7 @@
 use crate::bevy_tokio_tasks::{TokioTasksPlugin, TokioTasksRuntime};
 use bevy::prelude::*;
-use bevy::utils::HashMap;
+// use bevy::prelude::Command; // already included by prelude in 0.16
+use bevy_platform::collections::hash_map::HashMap;
 use bevygap_shared::nats::*;
 use lightyear::connection::netcode::ClientId;
 use lightyear::connection::server::{ConnectionRequestHandler, DeniedReason};

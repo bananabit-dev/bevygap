@@ -1,8 +1,10 @@
 use base64::prelude::*;
+use crate::traits::BevygapConnectExt;
+
 use bevy::prelude::*;
 use bevy_nfws::prelude::*;
 use bevygap_shared::protocol::*;
-use lightyear::prelude::{client::*, *};
+use lightyear::netcode::{ConnectToken, client::ClientConfig, NetConfig, Authentication};
 use std::net::SocketAddr;
 
 pub mod prelude {
@@ -248,6 +250,6 @@ fn handle_matchmaker_response(
 
 fn connect_client(mut commands: Commands, mut next_state: ResMut<NextState<BevygapClientState>>) {
     info!("Connecting to server...");
-    commands.connect_client();
+    commands.bevygap_connect_client();
     next_state.set(BevygapClientState::Finished);
 }
