@@ -4,8 +4,19 @@ use crate::traits::BevygapConnectExt;
 use bevy::prelude::*;
 use bevy_nfws::prelude::*;
 use bevygap_shared::protocol::*;
-use lightyear::netcode::{ConnectToken, client::ClientConfig, NetConfig, Authentication};
-use std::net::SocketAddr;
+use lightyear::netcode::{ConnectToken, Authentication, NetcodeClient, NetcodeConfig};
+use lightyear::prelude::*;
+use lightyear::prelude::client::*;
+use lightyear::webtransport::client::WebTransportClientIo;
+use std::net::{SocketAddr, Ipv4Addr};
+
+// Resource to store connection details from matchmaker
+#[derive(Resource, Clone)]
+pub struct ConnectionDetails {
+    pub connect_token: ConnectToken,
+    pub server_addr: SocketAddr,
+    pub cert_digest: String,
+}
 
 pub mod prelude {
     pub use super::traits::*;
@@ -110,7 +121,7 @@ fn request_token(
 fn handle_matchmaker_response(
     mut q: Query<(Entity, &mut NfwsHandle)>,
     mut commands: Commands,
-    mut client_config: ResMut<ClientConfig>,
+    // Store the connection details in a resource instead of directly modifying ClientConfig
     mut next_state: ResMut<NextState<BevygapClientState>>,
     config: Res<BevygapClientConfig>,
 ) {
@@ -216,28 +227,13 @@ fn handle_matchmaker_response(
 
                                 info!("Got matchmaker response, game server: {server_addr:?}");
 
-                                if let NetConfig::Netcode { auth, io, .. } = &mut client_config.net
-                                {
-                                    info!("Setting Netcode connect token and server addr");
-                                    *auth = Authentication::Token(connect_token);
-                                    // inject gameserver address and port into lightyear client transport
-                                    // (preserves existing client_addr if it was already set)
-                                    let client_addr = match &mut io.transport {
-                                        client::ClientTransport::WebTransportClient {
-                                            client_addr,
-                                            ..
-                                        } => client_addr,
-                                        _ => panic!("Unsupported transport: {:?}", io.transport),
-                                    };
-                                    io.transport = client::ClientTransport::WebTransportClient {
-                                        client_addr: *client_addr,
-                                        server_addr,
-                                        #[cfg(target_family = "wasm")]
-                                        certificate_digest: cert_digest,
-                                    };
-                                } else {
-                                    panic!("Unsupported netconfig, only supports Netcode for now.");
-                                }
+                                // Store connection details in a resource
+                                commands.insert_resource(ConnectionDetails {
+                                    connect_token,
+                                    server_addr,
+                                    cert_digest,
+                                });
+                                
                                 next_state.set(BevygapClientState::ReadyToConnect);
                             }
                         }
@@ -248,8 +244,43 @@ fn handle_matchmaker_response(
     }
 }
 
-fn connect_client(mut commands: Commands, mut next_state: ResMut<NextState<BevygapClientState>>) {
-    info!("Connecting to server...");
-    commands.bevygap_connect_client();
-    next_state.set(BevygapClientState::Finished);
+fn connect_client(
+    mut commands: Commands, 
+    mut next_state: ResMut<NextState<BevygapClientState>>,
+    connection_details: Option<Res<ConnectionDetails>>,
+) {
+    if let Some(details) = connection_details {
+        info!("Connecting to server at {:?}...", details.server_addr);
+        
+        // Spawn client entity with WebTransport and Netcode configuration
+        let client_entity = commands.spawn((
+            Client::default(),
+            Name::from("Client"),
+            LocalAddr(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 0)),
+            PeerAddr(details.server_addr),
+            Link::new(None),
+            ReplicationReceiver::default(),
+            PredictionManager::default(),
+            InterpolationManager::default(),
+            NetcodeClient::new(
+                Authentication::Token(details.connect_token.clone()),
+                NetcodeConfig::default(),
+            ).expect("Failed to create NetcodeClient"),
+            WebTransportClientIo { 
+                certificate_digest: details.cert_digest.clone(),
+            },
+        )).id();
+        
+        // Trigger connection
+        commands.trigger_targets(Connect, client_entity);
+        
+        info!("Client entity spawned: {:?}", client_entity);
+        next_state.set(BevygapClientState::Finished);
+    } else {
+        error!("No connection details available!");
+        next_state.set(BevygapClientState::Error(
+            500,
+            "Connection details not found".to_string()
+        ));
+    }
 }
