@@ -8,7 +8,7 @@ use clap::Parser;
 use edgegap_async::apis::applications_api::*;
 use edgegap_async::apis::configuration::*;
 use futures::stream::StreamExt;
-use lightyear::connection::netcode::PRIVATE_KEY_BYTES;
+use lightyear::netcode::PRIVATE_KEY_BYTES;
 use log::*;
 use tracing_subscriber::{layer::*, util::*};
 
@@ -53,6 +53,9 @@ pub struct Settings {
     /// (should write to nats for you, see bevygap_webhook_sink)
     #[arg(long, default_value = None)]
     session_webhook_url: Option<String>,
+    /// Optional maximum player limit for the lobby/session (1-4)
+    #[arg(long)]
+    player_limit: Option<u8>,
 }
 
 impl Settings {
@@ -121,6 +124,8 @@ impl MatchmakerState {
     pub(crate) fn lightyear_private_key(&self) -> [u8; PRIVATE_KEY_BYTES] {
         self.lypkey
     }
+    pub(crate) fn player_limit(&self) -> Option<u8> { self.settings.player_limit }
+    pub(crate) fn settings(&self) -> &Settings { &self.settings }
 }
 
 #[tokio::main]
@@ -185,7 +190,7 @@ async fn verify_application(state: &MatchmakerState) -> Result<(), async_nats::E
         .unwrap_or_else(|e| panic!("Edgegap API doesn't know this application name: {e}"));
 
     info!(
-        "🟢 Application '{}', active: {}, last_updated: {}",
+        "🟢 Application '{}' , active: {}, last_updated: {}",
         app.name, app.is_active, app.last_updated
     );
 

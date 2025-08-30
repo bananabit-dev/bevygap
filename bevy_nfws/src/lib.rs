@@ -1,4 +1,9 @@
 use bevy::prelude::*;
+use log::info;
+
+
+
+
 use async_channel::{unbounded, Receiver, Sender, TryRecvError};
 use futures_util::{select, FutureExt, SinkExt, StreamExt};
 use tokio_tungstenite_wasm::CloseCode;
@@ -27,11 +32,11 @@ fn start_new_ws_tasks(
         let cmd_rx = wschan.cmd_rx.take().unwrap();
         let ev_tx = wschan.ev_tx.take().unwrap();
         let url = wschan.ws_url.clone();
-        debug!("spawned ws task for {:?}", entity);
+        info!("spawned ws task for {:?}", entity);
         spawn_local(async move {
             let ev_tx2 = ev_tx.clone();
             let ret = connect_websocket(url, cmd_rx, ev_tx).await;
-            debug!("connect_websocket returned: {:?}", ret);
+        info!("connect_websocket returned: {:?}", ret);
             match ret {
                 Ok(()) => {}
                 Err(err) => { let _ = ev_tx2.send(NfwsEvent::Error(err)).await; }
@@ -81,7 +86,7 @@ async fn connect_websocket(url: String, cmd_rx: Receiver<NfwsCmd>, ev_tx: Sender
     let _ = ev_tx.send(NfwsEvent::Connecting).await;
     let Ok(ws) = tokio_tungstenite_wasm::connect(url).await else { return Err(NfwsErr::Connecting) };
     let (mut ws_sender, mut ws_receiver) = ws.split();
-    debug!("Connected to ws server."); let _ = ev_tx.send(NfwsEvent::Connected).await;
+    info!("Connected to ws server."); let _ = ev_tx.send(NfwsEvent::Connected).await;
     loop {
         let mut ws_recv = ws_receiver.next().fuse();
         let mut cmd_recv = Box::pin(cmd_rx.recv()).fuse();

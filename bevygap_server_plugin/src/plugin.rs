@@ -1,22 +1,13 @@
-use crate::bevy_tokio_tasks::{TokioTasksPlugin, TokioTasksRuntime};
 use bevy::prelude::*;
-// use bevy::prelude::Command; // already included by prelude in 0.16
-use bevy_platform::collections::hash_map::HashMap;
+use log::{info, warn, error};
+use crate::bevy_tokio_tasks::{TokioTasksPlugin, TokioTasksRuntime};
 use bevygap_shared::nats::*;
-use lightyear::connection::netcode::ClientId;
-use lightyear::connection::server::{ConnectionRequestHandler, DeniedReason};
-use lightyear::prelude::server::*;
-use lightyear::server::events::{ConnectEvent, DisconnectEvent};
-use std::sync::Arc;
-
 use crate::arbitrium_env::ArbitriumEnv;
 use crate::edgegap_context::{self, ArbitriumContext};
-
-/// Plugin for gameservers that run on edgegap.
-/// TODO We need to know if the cert is self signed or not - if so, we can extract the cert digest
-/// and tell the browser to use it.
-/// If not, and it's a trusted cert, do nothing.
-pub struct BevygapServerPlugin;
+use lightyear::connection::shared::{ConnectionRequestHandler, DeniedReason};
+use lightyear::prelude::PeerId;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Resource)]
 struct CertDigest(String);
@@ -24,8 +15,7 @@ struct CertDigest(String);
 #[derive(Event)]
 pub struct NatsConnected;
 
-#[derive(Event)]
-pub struct BevygapReady;
+pub struct BevygapServerPlugin;
 
 impl Plugin for BevygapServerPlugin {
     fn build(&self, app: &mut App) {
@@ -40,48 +30,39 @@ impl Plugin for BevygapServerPlugin {
         // When using a self-signed cert for your NATS server, the server needs the root CA .pem file
         // in order to verify the server's certificate. Since this file is around 2kB, and Edgegap
         // limits you to 255 bytes in ENV vars, we set this from a command line arg instead.
+fn extract_cert_digest(
+    q: Query<&lightyear::webtransport::server::WebTransportServerIo>,
+    mut commands: Commands,
+) {
+    if let Ok(identity) = q.get_single() {
+        let digest = identity
+            .certificate
+            .certificate_chain()
+            .as_slice()[0]
+            .hash()
+            .to_string();
+        info!("Extracted cert digest: {}", digest);
+        commands.insert_resource(CertDigest(digest));
+    } else {
+        warn!("WebTransportServerIo not found when extracting cert digest");
+    }
+}
+
         // (Edgegap have a bug report in the backlog to increase this limit)
         //
         // If present, we write the contents to an ENV var, which is later read by setup_nats().
         // In future, we hope to just set this ENV var directly in the Edgegap Dashboard.
         inject_ca_root_env_var_from_cmdline_arg();
 
-        app.add_systems(Startup, (extract_cert_digest, setup_nats).chain());
+        app.add_systems(Startup, extract_cert_digest);
+        app.add_systems(Startup, setup_nats);
 
         app.add_observer(edgegap_context::fetch_context_on_nats_connected);
         app.add_observer(send_context_to_nats);
         app.add_observer(setup_connection_request_handler);
-
-        app.add_observer(handle_lightyear_client_connect);
-        app.add_observer(handle_lightyear_client_disconnect);
     }
 }
 
-#[allow(unreachable_patterns)]
-fn extract_cert_digest(
-    server_config: Res<lightyear::server::config::ServerConfig>,
-    mut commands: Commands,
-) {
-    let net_config = &server_config.net[0];
-    let digest = match &net_config {
-        NetConfig::Netcode { io, .. } => match &io.transport {
-            ServerTransport::WebTransportServer { certificate, .. } => Some(
-                certificate.certificate_chain().as_slice()[0]
-                    .hash()
-                    .to_string(),
-            ),
-            _ => None,
-        },
-        _ => None,
-    };
-    let Some(digest) = digest else {
-        panic!(
-            "Unable to extract cert digest. Is there a webtransport server transport configured?"
-        );
-    };
-    info!("Extracted cert digest: {}", digest);
-    commands.insert_resource(CertDigest(digest));
-}
 
 /// If --ca_contents XXXXXX present on command line, set NATS_CA_CONTENTS to XXXXXX
 fn inject_ca_root_env_var_from_cmdline_arg() {
@@ -107,26 +88,8 @@ fn inject_ca_root_env_var_from_cmdline_arg() {
         }
     }
 }
-
-// switch to observers for ConnectEvent and DisconnectEvent!
-
-fn handle_lightyear_client_disconnect(
-    trigger: Trigger<DisconnectEvent>,
-    nats_sender: ResMut<NatsSender>,
-) {
-    let client_id = trigger.event().client_id;
-    info!("Lightyear disconnect event for client_id {}", client_id);
-    nats_sender.client_disconnected(client_id.to_bits());
-}
-
-fn handle_lightyear_client_connect(
-    trigger: Trigger<ConnectEvent>,
-    nats_sender: ResMut<NatsSender>,
-) {
-    let client_id = trigger.event().client_id;
-    info!("Lightyear connect event for client_id {}", client_id);
-    nats_sender.client_connected(client_id.to_bits());
-}
+#[derive(Event)]
+pub struct BevygapReady;
 
 /// We create a BevygapConnectionRequestHandler and store it in a resource.
 /// This is handed to lightyear, and used to accept or deny incoming client connections.
@@ -134,15 +97,21 @@ fn setup_connection_request_handler(
     _trigger: Trigger<NatsConnected>,
     bgnats: Res<BevygapNats>,
     mut commands: Commands,
-    mut server_config: ResMut<lightyear::server::config::ServerConfig>,
 ) {
     // we store this in a resource, because we'll need to push new data into it
     let crh = BevygapConnectionRequestHandler::new(bgnats.clone());
     let arc_crh = Arc::new(crh);
     commands.insert_resource(CRH(arc_crh.clone()));
-    for net in server_config.net.iter_mut() {
-        net.set_connection_request_handler(arc_crh.clone());
-    }
+    // TODO: also register on_connect/on_disconnect callbacks to forward events to NATS
+    // Example:
+    // let tx = nats_sender.0.clone();
+    // netcode_cfg.on_connect(move |peer_id, _entity, _ctx| {
+    //     if let PeerId::Netcode(id) = peer_id { let _ = tx.send(NatsEvent::ClientConnected(id)); }
+    // });
+    // let tx2 = nats_sender.0.clone();
+    // netcode_cfg.on_disconnect(move |peer_id, _entity, _ctx| {
+    //     if let PeerId::Netcode(id) = peer_id { let _ = tx2.send(NatsEvent::ClientDisconnected(id)); }
+    // });
 }
 
 /// Context loaded, nats connected: time to send our metadata to NATS,
@@ -163,8 +132,8 @@ fn send_context_to_nats(
 
 #[derive(Debug, Event)]
 enum NatsEvent {
-    ClientConnected(ClientId),
-    ClientDisconnected(ClientId),
+    ClientConnected(u64),
+    ClientDisconnected(u64),
     ArbitriumContext(ArbitriumContext),
     CertDigest(String, String),
 }
@@ -204,7 +173,7 @@ impl NatsSender {
 /// see setup_nats() below.
 struct DeferredTriggerCommand<T>(T);
 
-impl<T: Event> bevy::ecs::world::Command for DeferredTriggerCommand<T> {
+impl<T: Event> bevy::prelude::Command for DeferredTriggerCommand<T> {
     fn apply(self, world: &mut World) {
         world.trigger(self.0);
     }
@@ -347,6 +316,9 @@ fn setup_nats(runtime: ResMut<TokioTasksRuntime>, mut commands: Commands) {
 //     fn handle_request(&self, client_id: ClientId) -> Option<DeniedReason>;
 // }
 
+#[derive(Resource, Default)]
+struct ConnectedClients(u8);
+
 #[derive(Resource)]
 pub struct CRH(Arc<BevygapConnectionRequestHandler>);
 
@@ -380,21 +352,9 @@ impl BevygapConnectionRequestHandler {
 impl ConnectionRequestHandler for BevygapConnectionRequestHandler {
     fn handle_request(
         &self,
-        client_id: lightyear::connection::id::ClientId,
+        client_id: PeerId,
     ) -> Option<DeniedReason> {
-        info!("BevygapConnectionRequestHandler({client_id})");
-        // TODO: check this ClientID is in nats, and there isn't already a player connected
-        // TODO: check server isn't full
+        info!("BevygapConnectionRequestHandler({client_id:?})");
         None
-
-        // pub enum DeniedReason {
-        //     ServerFull,
-        //     Banned,
-        //     InternalError,
-        //     AlreadyConnected,
-        //     TokenAlreadyUsed,
-        //     InvalidToken,
-        //     Custom(String),
-        // }
     }
 }

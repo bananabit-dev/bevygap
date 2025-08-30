@@ -5,7 +5,7 @@ use base64::prelude::*;
 use bevygap_shared::protocol::*;
 use edgegap_async::{apis::sessions_api::*, apis::Error as EdgegapError, models::SessionModel};
 use futures::StreamExt;
-use lightyear::prelude::ConnectToken;
+use lightyear::netcode::ConnectToken;
 use log::*;
 use serde::{de, Deserialize};
 use std::net::{IpAddr, SocketAddr};

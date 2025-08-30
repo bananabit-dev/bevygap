@@ -1,6 +1,9 @@
 use base64::prelude::*;
 
-use bevy::prelude::*;
+use bevy::prelude::{App, Plugin, Res, ResMut, Commands, Entity, Name, Resource, Update, Query, IntoScheduleConfigs};
+use bevy_state::prelude::{States, State, NextState, OnEnter};
+use bevy_state::app::AppExtStates;
+use log::{info, warn, error};
 use bevy_nfws::prelude::*;
 use bevygap_shared::protocol::*;
 use lightyear::netcode::ConnectToken;
@@ -144,6 +147,7 @@ fn handle_matchmaker_response(
                             client_ip: config.fake_client_ip.clone(),
                             game: config.game_name.clone(),
                             version: config.game_version.clone(),
+                            player_limit: std::env::var("VOIDLOOP_PLAYER_LIMIT").ok().and_then(|s| s.parse::<u8>().ok()),
                         };
                         let payload = serde_json::to_string(&req).unwrap();
                         info!("Sending payload: {payload}");

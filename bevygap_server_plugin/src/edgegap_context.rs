@@ -4,6 +4,8 @@
 use crate::arbitrium_env::ArbitriumEnv;
 use crate::bevy_tokio_tasks::TokioTasksRuntime;
 use bevy::prelude::*;
+use log::{info, error};
+
 
 #[derive(Event)]
 pub(crate) struct ContextLoaded;
