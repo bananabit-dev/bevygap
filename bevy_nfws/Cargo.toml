@@ -20,8 +20,14 @@ tokio-tungstenite-wasm = "0.3.1"
 futures-util.workspace = true
 async-channel.workspace = true
 wasm-bindgen-futures = "0.4"
-tokio.workspace = true
 log = "0.4"
+
+# Use a minimal, wasm-safe tokio on wasm and the workspace tokio (full) on native
+[target."cfg(target_family = \"wasm\")".dependencies]
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "sync"] }
+
+[target."cfg(not(target_family = \"wasm\") )".dependencies]
+tokio.workspace = true
 
 [lints]
 workspace = true
