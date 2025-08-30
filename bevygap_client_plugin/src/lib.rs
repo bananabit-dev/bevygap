@@ -1,10 +1,9 @@
 use base64::prelude::*;
-use crate::traits::BevygapConnectExt;
 
 use bevy::prelude::*;
 use bevy_nfws::prelude::*;
 use bevygap_shared::protocol::*;
-use lightyear::netcode::{ConnectToken, Authentication, NetcodeClient, NetcodeConfig};
+use lightyear::netcode::ConnectToken;
 use lightyear::prelude::*;
 use lightyear::prelude::client::*;
 use lightyear::webtransport::client::WebTransportClientIo;
