@@ -25,6 +25,8 @@ use tracing_subscriber::{layer::*, util::*};
 mod session_request_handler;
 mod session_request_handler_ws;
 
+
+
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct Settings {
@@ -36,6 +38,10 @@ pub struct Settings {
     /// The ip:port to bind the http listener to
     #[arg(long, default_value = "0.0.0.0:3000")]
     bind: String,
+    /// Optional player limit for wannaplay() (1-4)
+    #[arg(long)]
+    player_limit: Option<u8>,
+
 
     /// A fake IP to use instead of the client IP, if the request comes from localhost.
     ///
@@ -149,6 +155,7 @@ async fn wannaplay_handler(
     // client_ip is the one sent to Edgegap, to decide which server to assign the player to.
     // We use one provided in the qs, otherwise the connecting IP of the http client.
     let mut client_ip = params.client_ip.unwrap_or(addr.ip().to_string());
+    let player_limit = state.settings.player_limit.map(|n| n.clamp(1,4));
     // Check for X-Forwarded-For header, since this is probably running behind a proxy
     if let Some(forwarded_for) = req.headers().get("X-Forwarded-For") {
         if let Ok(forwarded_ip) = forwarded_for.to_str() {
@@ -168,7 +175,7 @@ async fn wannaplay_handler(
     }
 
     info!("wannaplay_handler req for ip {client_ip}");
-    let payload = format!("{{\"client_ip\":\"{client_ip}\"}}");
+    let payload = if let Some(limit) = player_limit { format!("{{\"client_ip\":\"{client_ip}\", \"player_limit\": {limit}}}") } else { format!("{{\"client_ip\":\"{client_ip}\"}}") };
 
     // this timeout should far exceed the cutoff time in the matchmaker.
     // it is merely a last line of defense.

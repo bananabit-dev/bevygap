@@ -117,9 +117,15 @@ async fn handle_socket_inner(
     let subject = format!("matchmaker.request.{game_name}.{game_ver}");
 
     // this should be safe because of our regex check on name and version..
-    let payload = format!(
-        "{{\"client_ip\":\"{client_ip}\", \"game\":\"{game_name}\", \"version\":\"{game_ver}\"}}"
-    );
+    let payload = if let Some(limit) = request_session.player_limit {
+        format!(
+            r#"{{"client_ip":"{client_ip}", "game":"{game_name}", "version":"{game_ver}", "player_limit": {limit}}}"#
+        )
+    } else {
+        format!(
+            r#"{{"client_ip":"{client_ip}", "game":"{game_name}", "version":"{game_ver}"}}"#
+        )
+    };
 
     info!("Sending request to {subject} with payload {payload}");
 

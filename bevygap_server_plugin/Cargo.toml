@@ -17,6 +17,8 @@ url.workspace = true
 reqwest.workspace = true
 lightyear.workspace = true
 async-nats.workspace = true
+log.workspace = true
+
 # tokio.workspace = true
 # yoinked into a local src file for now due to no published version:
 #bevy-tokio-tasks.workspace = true

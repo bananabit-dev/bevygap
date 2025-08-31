@@ -16,11 +16,16 @@ default = []
 matchmaker-tls = ["bevy_nfws/wss"]
 
 [dependencies]
-lightyear = { workspace = true, features = ["webtransport"] }
+# On the client plugin we do not need server features; they pull in extra deps (tokio net) on wasm.
+lightyear = { workspace = true, features = ["webtransport","replication","interpolation","netcode","prediction","client"] }
 bevy.workspace = true
+log.workspace = true
+
 base64.workspace = true
 bevy_nfws.workspace = true
 serde_json.workspace = true
+bevy_state = { version = "0.16.1" }
+
 bevygap_shared.workspace = true
 
 [dev-dependencies]

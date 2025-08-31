@@ -1,4 +1,11 @@
 use serde::{Deserialize, Serialize};
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum LobbyAction {
+    Create,
+    Join,
+    List,
+}
+
 use std::fmt;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -48,6 +55,9 @@ pub struct RequestSession {
     pub version: String,
     /// client ip address override
     pub client_ip: Option<String>,
+    /// optional player limit (1-4)
+    #[serde(default)]
+    pub player_limit: Option<u8>,
 }
 
 impl RequestSession {

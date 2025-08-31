@@ -25,6 +25,7 @@ license = "MIT OR Apache-2.0"
 [profile.dev.package."*"]
 opt-level = 3
 
+
 # If your own code does CPU-intensive work, you might want to also enable some optimization for it.
 # Enable only a small amount of optimization in debug mode
 [profile.dev]
@@ -46,11 +47,11 @@ bevy_nfws = { path = "./bevy_nfws", version = "0.3.1" }
 
 # YOU MUST USE SAME LY VER AS GAME
 # Otherwise resources from lightyear won't be found.
-lightyear = { version = "0.18", default-features = false, features = [
-  "webtransport",
+lightyear = { git = "https://github.com/bananabit-dev/lightyear.git",  default-features = false, features = [
+  "webtransport","server","client","prediction","replication","interpolation","netcode"
 ] }
 
-bevy = { version = "0.15", default-features = false }
+bevy = { version = "0.16", default-features = false }
 
 # No 0.15 version yet, PR open. vendored the source file in server plugin for now.
 #bevy-tokio-tasks = "0.14"
@@ -62,7 +63,7 @@ axum = { version = "0.7.7", features = ["ws"] }
 anyhow = "1.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-async-nats = { version = "0.36.0", features = ["service"] }
+async-nats = { version = "0.37.0", default-features = false, features = ["service", "ring"] }
 log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

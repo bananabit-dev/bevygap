@@ -14,11 +14,20 @@ description = "A no-frills websocket client library for bevy, native and wasm."
 wss = ["tokio-tungstenite-wasm/rustls-tls-native-roots"]
 
 [dependencies]
-bevy.workspace = true
+bevy = { workspace = true, features = ["bevy_render", "bevy_core_pipeline", "bevy_gizmos", "tonemapping_luts", "smaa_luts", "default_font", "png", "hdr", "x11", "webgl2", "bevy_winit", "bevy_sprite", "bevy_text", "bevy_ui"] }
 tokio-tungstenite-wasm = "0.3.1"
-bevy_async_task.workspace = true
+# bevy_async_task.workspace = true
 futures-util.workspace = true
 async-channel.workspace = true
+wasm-bindgen-futures = "0.4"
+log = "0.4"
+
+# Use a minimal, wasm-safe tokio on wasm and the workspace tokio (full) on native
+[target."cfg(target_family = \"wasm\")".dependencies]
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "sync"] }
+
+[target."cfg(not(target_family = \"wasm\") )".dependencies]
+tokio.workspace = true
 
 [lints]
 workspace = true
