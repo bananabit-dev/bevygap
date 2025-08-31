@@ -17,6 +17,7 @@ jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
+    environment: main
     permissions:
       packages: write
       contents: read
@@ -36,7 +37,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: metabrew/bevygap_webhook_sink
+          images: bananabit/bevygap_webhook_sink
           tags: |
             type=semver,pattern={{version}}
             type=sha,format=long
