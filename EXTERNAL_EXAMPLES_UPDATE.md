@@ -20,7 +20,7 @@ bevygap_client_plugin = {git = "https://github.com/bananabit-dev/bevygap.git", r
 bevygap_server_plugin = {git = "https://github.com/bananabit-dev/bevygap.git", rev = "1921c864b3414f45e679894733c2e19fe5e0ecfd"}
 ```
 
-**Note:** The rev `1921c864b3414f45e679894733c2e19fe5e0ecfd` is the latest commit on the main branch of bananabit-dev/bevygap at the time of this update.
+**Note:** The rev `1921c864b3414f45e679894733c2e19fe5e0ecfd` is the latest commit on the main branch of bananabit-dev/bevygap at the time of this update. For the absolute latest changes including recent example fixes, you may also use rev `4127d21b86ee7d1f8dd7aa1d4973e53b4fbb3337`.
 
 ### Alternative: Use Main Branch (Latest)
 If you want to always use the latest version:
@@ -33,6 +33,35 @@ bevygap_server_plugin = {git = "https://github.com/bananabit-dev/bevygap.git", b
 
 1. **For repository owners**: Update the dependencies in external example repositories to use `bananabit-dev/bevygap`
 2. **For users following the documentation**: Use the new repository URL when setting up examples
+
+## API Changes to Be Aware Of
+
+When updating to the latest bevygap, you may need to make the following code changes:
+
+### bevygap_client_plugin Examples
+If you have code that uses lightyear's `ClientConfig`:
+```rust
+// OLD - No longer works
+use lightyear::prelude::client::ClientConfig;
+app.insert_resource(ClientConfig::default());
+
+// NEW - Use BevygapClientConfig instead
+use bevygap_client_plugin::prelude::*;
+app.insert_resource(BevygapClientConfig::default());
+```
+
+### bevy_nfws Examples
+If you have examples that use logging:
+```rust
+// OLD - Missing import
+use bevy::prelude::*;
+use bevy_nfws::prelude::*;
+
+// NEW - Add log import
+use bevy::prelude::*;
+use bevy_nfws::prelude::*;
+use log::info;
+```
 
 ## Version Information
 
