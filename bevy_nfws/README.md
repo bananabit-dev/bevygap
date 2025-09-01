@@ -5,7 +5,7 @@ No-frills websocket client, wasm + native.
 Uses tokio-tungstenite-wasm for websocket communication in an async task, and some channels 
 to bridge you into sync bevy-land.
 
-Used to talk to a matchmaker in [bevygap_client_plugin](https://github.com/RJ/bevygap/).
+Used to talk to a matchmaker in [bevygap_client_plugin](https://github.com/bananabit-dev/bevygap/).
 
 ### Example usage
 

@@ -1,1 +1,1 @@
- Shared lib used by client and server plugins for [bevygap](https://github.com/RJ/bevygap).
+ Shared lib used by client and server plugins for [bevygap](https://github.com/bananabit-dev/bevygap).
