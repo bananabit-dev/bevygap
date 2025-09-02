@@ -1,3 +1,20 @@
+# Client Implementation
+
+In this chapter, we'll implement the game client that provides a visual interface for players and handles user input.
+
+## Client Architecture
+
+The client is responsible for:
+- **User Interface**: Displaying the game world and UI elements
+- **Input Handling**: Capturing player input and sending it to the server
+- **Rendering**: Drawing snakes, food, and game information
+- **Connection Management**: Connecting to the server through BevyGap
+
+## Basic Client Setup
+
+Let's set up the basic client structure in `client/src/main.rs`:
+
+```rust
 use bevy::prelude::*;
 use bevygap_client_plugin::prelude::*;
 use snake_shared::*;
@@ -41,12 +58,13 @@ impl Plugin for SnakeClientPlugin {
         );
     }
 }
+```
 
-#[derive(Resource, Default)]
-struct InputBuffer {
-    last_direction: Option<Direction>,
-}
+## Local Game State
 
+For this demo, we'll maintain a local game state to show how the game logic works:
+
+```rust
 #[derive(Resource)]
 struct LocalGameState {
     snake: Snake,
@@ -65,7 +83,13 @@ impl Default for LocalGameState {
         }
     }
 }
+```
 
+## Camera and UI Setup
+
+Set up the camera and basic UI:
+
+```rust
 fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
@@ -86,14 +110,16 @@ fn setup_ui(mut commands: Commands) {
 
 #[derive(Component)]
 struct ScoreText;
+```
 
-fn setup_demo_game(mut local_state: ResMut<LocalGameState>) {
-    // Create a demo snake
-    local_state.snake = Snake::new(1, Vec2::new(-100.0, 0.0));
-    
-    // Add some demo food
-    local_state.food.push(Food::new(Vec2::new(100.0, 50.0)));
-    local_state.food.push(Food::new(Vec2::new(-50.0, -100.0)));
+## Input Handling
+
+Capture player input and apply it to the local snake:
+
+```rust
+#[derive(Resource, Default)]
+struct InputBuffer {
+    last_direction: Option<Direction>,
 }
 
 fn handle_input(
@@ -121,7 +147,13 @@ fn handle_input(
         }
     }
 }
+```
 
+## Game Logic Update
+
+Update the demo game state locally:
+
+```rust
 fn update_demo_game(
     time: Res<Time>,
     mut local_state: ResMut<LocalGameState>,
@@ -132,16 +164,15 @@ fn update_demo_game(
     if local_state.game_time > 0.3 { // Move every 300ms
         local_state.game_time = 0.0;
         
-        // Update snake
+        // Update snake movement
         local_state.snake.update_direction();
         
         let new_head = local_state.snake.head_position() + local_state.snake.direction.to_vec2();
         
-        // Handle world bounds
+        // Handle world bounds (wrap around)
         if utils::is_in_bounds(new_head) {
             local_state.snake.segments.push_front(new_head);
         } else {
-            // Wrap around
             let wrapped = utils::clamp_to_world(new_head);
             local_state.snake.segments.push_front(wrapped);
         }
@@ -175,12 +206,18 @@ fn update_demo_game(
         }
         
         // Spawn new food if needed
-        if local_state.food.len() < 3 { // Keep at least 3 food items
+        if local_state.food.len() < 3 {
             local_state.food.push(Food::new(utils::random_grid_position()));
         }
     }
 }
+```
 
+## Rendering System
+
+Render the game world using Bevy's gizmos:
+
+```rust
 fn render_game(
     local_state: Res<LocalGameState>,
     mut gizmos: Gizmos,
@@ -214,3 +251,92 @@ fn render_game(
         **text = format!("Snake Demo - Use WASD to move | Score: {} | Ready for Networking!", local_state.score);
     }
 }
+```
+
+## Adding Network Support
+
+For full multiplayer functionality, you would add connection handling:
+
+```rust
+// These systems would be added for full networking:
+fn connect_to_server(mut commands: Commands) {
+    // Use BevyGap to connect to the server
+    commands.bevygap_connect_client();
+}
+
+fn handle_connection_state(
+    state: Res<State<BevygapClientState>>,
+    // Handle different connection states
+    // Show appropriate UI feedback
+) {
+    // Implementation would go here
+}
+
+fn send_input_to_server(
+    // Send player input to the server instead of applying locally
+    // Use Lightyear's message system
+) {
+    // Implementation would go here
+}
+
+fn receive_game_state(
+    // Receive authoritative game state from server
+    // Update local rendering based on server data
+) {
+    // Implementation would go here
+}
+```
+
+## Testing the Client
+
+You can test the client demo:
+
+```bash
+cargo run -p snake_client
+```
+
+The client will:
+1. Display a window with the game
+2. Show a controllable snake
+3. Spawn food that can be eaten
+4. Track score
+5. Demonstrate game mechanics
+
+## Key Features
+
+### Input Responsiveness
+- Immediate input feedback for smooth controls
+- Direction changes are buffered to prevent invalid moves
+- Support for both WASD and arrow keys
+
+### Visual Feedback
+- Clear snake rendering with head/body distinction
+- Attractive food rendering
+- Real-time score updates
+- Visual indication of game state
+
+### Local Demo Mode
+- Fully functional single-player version
+- Shows how multiplayer would work
+- Easy to extend with networking
+
+## Performance Considerations
+
+### Efficient Rendering
+- Uses Bevy's gizmo system for simple shapes
+- Minimal draw calls
+- Smooth animations
+
+### Responsive Input
+- Input handled every frame
+- Separate from game logic timing
+- No input lag
+
+## What's Next?
+
+Now that we have both client and server implementations, let's move on to [Running the Game](./running.md) where we'll learn how to:
+
+- Run the server and client
+- Test the local demo mode
+- Prepare for full networking
+- Deploy with BevyGap
