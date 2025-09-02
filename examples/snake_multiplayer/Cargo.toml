@@ -1,0 +1,27 @@
+[workspace]
+members = ["shared", "server", "client"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["BevyGap Team <info@bevygap.dev>"]
+
+[workspace.dependencies]
+# Bevy and BevyGap dependencies
+bevy = { version = "0.16", default-features = false }
+bevygap_client_plugin = { path = "../../bevygap_client_plugin" }
+bevygap_server_plugin = { path = "../../bevygap_server_plugin" }
+
+# Lightyear for networking (must match BevyGap's version)
+lightyear = { git = "https://github.com/bananabit-dev/lightyear.git", default-features = false, features = [
+  "webtransport","server","client","prediction","replication","interpolation","netcode"
+] }
+
+# Common dependencies
+serde = { version = "1.0", features = ["derive"] }
+rand = "0.8"
+log = "0.4"
+
+# Shared crate
+snake_shared = { path = "./shared" }

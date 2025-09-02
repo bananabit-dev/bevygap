@@ -1,0 +1,22 @@
+[package]
+name = "snake_client"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+bevy = { workspace = true, features = [
+    "bevy_state",
+    "bevy_winit",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_sprite",
+    "bevy_text",
+    "bevy_ui",
+    "bevy_gizmos",
+    "png",
+    "default_font",
+] }
+bevygap_client_plugin.workspace = true
+snake_shared.workspace = true
+log.workspace = true
