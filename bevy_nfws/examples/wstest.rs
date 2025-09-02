@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_nfws::prelude::*;
+use log::info;
 
 fn main() {
     let mut app = App::new();

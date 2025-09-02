@@ -11,5 +11,5 @@ cd edgegap_async
 cat Cargo.toml | \
 	sed -e 's/^description =.*$/description = "Auto-generated client library for the Edgegap API (async), used by bevygap"/' \
 	    -e '/^description.*/a \
-repository = "https://github.com/RJ/bevygap/"' > Cargo.toml.publish \
+repository = "https://github.com/bananabit-dev/bevygap/"' > Cargo.toml.publish \
 	&& rm Cargo.toml && mv Cargo.toml.publish Cargo.toml

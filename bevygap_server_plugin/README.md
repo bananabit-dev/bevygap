@@ -1,4 +1,4 @@
-This is the bevy plugin that runs on the game server instance on edgegap, part of  [bevygap](https://github.com/RJ/bevygap)
+This is the bevy plugin that runs on the game server instance on edgegap, part of  [bevygap](https://github.com/bananabit-dev/bevygap)
 
 Read the [bevygap book](https://rj.github.io/bevygap/) to learn more.
 
