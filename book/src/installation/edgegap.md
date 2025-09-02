@@ -22,6 +22,13 @@ EDGEGAP_API_KEY="token asjhgaskjdhasd-kjhasd-asd-asd-asd"
 Fork the [bevygap-spaceships](https://github.com/RJ/bevygap-spaceships/) repository into your own github account. 
 This is the Lightyear "spaceships" example game, modified to run as a headless server and client that expects to connect using Webtransport (and is thus WASM-compatible).
 
+> **Important**: When using the bevygap-spaceships example, make sure to update the dependencies in `Cargo.toml` to use the maintained fork:
+> ```toml
+> bevygap_client_plugin = {git = "https://github.com/bananabit-dev/bevygap.git", branch = "main"}
+> bevygap_server_plugin = {git = "https://github.com/bananabit-dev/bevygap.git", branch = "main"}
+> ```
+> See the [External Examples Update Guide](../../../EXTERNAL_EXAMPLES_UPDATE.md) for more details.
+
 To build the gameserver docker image with Github Actions, you must tell github some of your credentials.
 
 Visit the "Container Registry" page on the Edgegap dashboard, to see the credentials you need to push

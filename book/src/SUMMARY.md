@@ -1,6 +1,7 @@
 # Summary
 
 - [Introduction](./introduction.md)
+- [Getting Started](./getting_started.md)
 - [Installation](./installation/index.md)
     - [NATS Server Setup](./installation/nats.md)
     - [Bevygap NATS Setup](./installation/bevygap_nats.md)
