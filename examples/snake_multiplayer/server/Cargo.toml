@@ -1,0 +1,20 @@
+[package]
+name = "snake_server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+bevy = { workspace = true, features = [
+    "bevy_state",
+] }
+bevygap_server_plugin.workspace = true
+lightyear = { workspace = true, features = [
+    "server",
+    "webtransport",
+    "netcode",
+    "replication",
+] }
+snake_shared.workspace = true
+log.workspace = true
+rand.workspace = true
