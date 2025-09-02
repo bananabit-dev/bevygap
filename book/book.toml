@@ -1,7 +1,7 @@
 [book]
-authors = ["RJ"]
+authors = ["RJ", "bananabit-dev"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Bevygap DRAFT"
-site-url = "/bevygap-book/"
+title = "Bevygap Documentation (Fork)"
+site-url = "/bevygap/"
