@@ -69,8 +69,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 futures = "0.3"
 futures-util = { version = "0.3", features = ["sink"] }
-# TODO: minimise tokio features as needed:
-tokio = { version = "1.0", features = ["full"] }
+# Use WASM-safe tokio features only, since some workspace members may be compiled for WASM
+tokio = { version = "1.0", features = ["sync", "macros", "io-util", "rt", "time"] }
 tokio-stream = "0.1.16"
 tokio-tungstenite = "0.23"
 clap = { version = "4.4", features = ["derive"] }
