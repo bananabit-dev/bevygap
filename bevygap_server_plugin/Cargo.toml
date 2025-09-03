@@ -22,7 +22,7 @@ log.workspace = true
 # tokio.workspace = true
 # yoinked into a local src file for now due to no published version:
 #bevy-tokio-tasks.workspace = true
-tokio = { version = "1", features = ["rt", "sync", "full"] }
+tokio = { version = "1", features = ["rt", "sync", "macros", "time"] }
 
 
 [lints]
