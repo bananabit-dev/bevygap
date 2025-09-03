@@ -26,7 +26,7 @@ bevy_nfws.workspace = true
 serde_json.workspace = true
 bevy_state = { version = "0.16.1" }
 
-bevygap_shared.workspace = true
+bevygap_shared = { workspace = true, default-features = false, features = ["bevy"] }
 
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }
