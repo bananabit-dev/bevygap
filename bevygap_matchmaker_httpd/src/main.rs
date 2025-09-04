@@ -1,14 +1,12 @@
 use async_nats::client::RequestErrorKind;
 use axum::extract::{Request, State};
-use axum::http::{header, HeaderValue, Method};
-use axum::routing::post;
+use axum::http::{header, HeaderValue, Method, StatusCode};
+use axum::routing::{any, get, post};
 use axum::{
     extract::ConnectInfo,
     extract::Query,
-    http::StatusCode,
     response::Html,
     response::{IntoResponse, Response},
-    routing::{any, get},
     Router,
 };
 use bevygap_shared::nats::*;
@@ -24,8 +22,7 @@ use tracing_subscriber::{layer::*, util::*};
 
 mod session_request_handler;
 mod session_request_handler_ws;
-
-
+mod lobby;
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
@@ -42,6 +39,9 @@ pub struct Settings {
     #[arg(long)]
     player_limit: Option<u8>,
 
+    /// Maximum number of active lobby rooms
+    #[arg(long, default_value_t = default_max_rooms())]
+    max_rooms: usize,
 
     /// A fake IP to use instead of the client IP, if the request comes from localhost.
     ///
@@ -53,6 +53,10 @@ pub struct Settings {
     fake_ip: String,
 }
 
+fn default_max_rooms() -> usize {
+    std::env::var("LOBBY_MAX_ROOMS").ok().and_then(|s| s.parse().ok()).unwrap_or(10)
+}
+
 impl Settings {
     pub fn allowed_origin(&self) -> String {
         self.cors.trim().to_string()
@@ -62,6 +66,7 @@ impl Settings {
 pub(crate) struct AppState {
     pub(crate) bgnats: BevygapNats,
     pub(crate) settings: Settings,
+    pub(crate) lobby: lobby::LobbyStore,
 }
 
 #[tokio::main]
@@ -74,6 +79,7 @@ async fn main() {
         .unwrap();
     let app_state = Arc::new(AppState {
         bgnats,
+        lobby: lobby::LobbyStore::new(settings.max_rooms),
         settings: settings.clone(),
     });
 
@@ -114,6 +120,11 @@ async fn main() {
             "/matchmaker/ws",
             any(session_request_handler_ws::handler_websocket),
         )
+        // Lobby API
+        .route("/lobby/api/rooms", get(lobby::list_rooms).post(lobby::create_room))
+        .route("/lobby/api/status", get(lobby::lobby_status))
+        .route("/lobby/api/rooms/:id/start", post(lobby::start_room))
+        .route("/lobby/api/rooms/:id/leave", post(lobby::leave_room))
         .layer(cors_layer)
         .with_state(app_state);
 
