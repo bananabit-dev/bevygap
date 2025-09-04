@@ -70,7 +70,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 futures = "0.3"
 futures-util = { version = "0.3", features = ["sink"] }
 # Use WASM-safe tokio features only, since some workspace members may be compiled for WASM
-tokio = { version = "1.0", features = ["sync", "macros", "io-util", "rt", "time"] }
+tokio = { version = "1.0", features = ["sync", "macros", "io-util", "rt", "rt-multi-thread", "time"] }
 tokio-stream = "0.1.16"
 tokio-tungstenite = "0.23"
 clap = { version = "4.4", features = ["derive"] }
