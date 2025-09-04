@@ -25,7 +25,7 @@ pub struct CreateRoomRequest {
     pub max_players: Option<u32>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct LobbyStore {
     pub rooms: Mutex<HashMap<String, LobbyRoom>>, // id -> room
     pub max_rooms: usize,
@@ -33,6 +33,13 @@ pub struct LobbyStore {
 
 impl LobbyStore {
     pub fn new(max_rooms: usize) -> Self { Self { rooms: Mutex::new(HashMap::new()), max_rooms } }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct LobbyStatus {
+    pub max_rooms: usize,
+    pub active_rooms: usize,
+    pub total_rooms: usize,
 }
 
 fn now_secs() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
@@ -58,20 +65,6 @@ pub async fn create_room(State(state): State<Arc<AppState>>, Json(req): Json<Cre
         host_name: req.host_name,
         game_mode: req.game_mode,
         created_at: now_secs(),
-#[derive(Clone, Debug, Serialize)]
-pub struct LobbyStatus {
-    pub max_rooms: usize,
-    pub active_rooms: usize,
-    pub total_rooms: usize,
-}
-
-pub async fn lobby_status(State(state): State<Arc<AppState>>) -> Json<LobbyStatus> {
-    let rooms = state.lobby.rooms.lock().unwrap();
-    let total = rooms.len();
-    let active = rooms.values().filter(|r| !r.started).count();
-    Json(LobbyStatus { max_rooms: state.lobby.max_rooms, active_rooms: active, total_rooms: total })
-}
-
         started: false,
         current_players: 1,
         max_players: req.max_players.unwrap_or(4).min(16),
@@ -79,6 +72,13 @@ pub async fn lobby_status(State(state): State<Arc<AppState>>) -> Json<LobbyStatu
     rooms.insert(id.clone(), room.clone());
     info!("Created lobby room {}", id);
     Ok(Json(room))
+}
+
+pub async fn lobby_status(State(state): State<Arc<AppState>>) -> Json<LobbyStatus> {
+    let rooms = state.lobby.rooms.lock().unwrap();
+    let total = rooms.len();
+    let active = rooms.values().filter(|r| !r.started).count();
+    Json(LobbyStatus { max_rooms: state.lobby.max_rooms, active_rooms: active, total_rooms: total })
 }
 
 pub async fn start_room(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> Result<(), (axum::http::StatusCode, String)> {

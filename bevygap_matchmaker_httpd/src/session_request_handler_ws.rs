@@ -10,7 +10,7 @@ use axum::{
 };
 use bevygap_shared::protocol::RequestSession;
 use log::*;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
