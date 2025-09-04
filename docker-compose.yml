@@ -91,9 +91,10 @@ services:
       NATS_PASS: "matchmaker_httpd"
       NATS_HOST: "nats"
       NATS_INSECURE: "set"
+    # For production, set CORS to match your domain, e.g.: --cors https://yourdomain.com
     command: "--cors http://127.0.0.1"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.matchmaker.rule=PathPrefix(`/matchmaker`)"
+      - "traefik.http.routers.matchmaker.rule=PathPrefix(`/matchmaker`) || PathPrefix(`/lobby`)"
       - "traefik.http.services.matchmaker.loadbalancer.server.port=3000"
       - "traefik.http.services.matchmaker.loadbalancer.responseforwarding.flushinterval=-1"

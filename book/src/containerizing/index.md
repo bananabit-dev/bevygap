@@ -59,6 +59,26 @@ Each service requires specific environment variables for:
 - HTTP service needs to be accessible to game clients
 - Consider using a reverse proxy like Traefik for SSL termination
 
+#### Reverse Proxy Configuration
+When deploying with a reverse proxy (like Traefik), ensure that all necessary paths are routed to the matchmaker HTTP service:
+- `/matchmaker/*` - For matchmaker WebSocket and HTTP endpoints
+- `/lobby/*` - For lobby API endpoints
+
+Example Traefik routing rule:
+```yaml
+- "traefik.http.routers.matchmaker.rule=PathPrefix(`/matchmaker`) || PathPrefix(`/lobby`)"
+```
+
+#### CORS Configuration
+Set the CORS origin to match your deployment domain:
+```bash
+# For production deployment
+--cors https://yourdomain.com
+
+# For local development  
+--cors http://localhost:8000
+```
+
 ### Monitoring and Logging
 - Services log to stdout/stderr for container log aggregation
 - Consider setting up proper log aggregation and monitoring

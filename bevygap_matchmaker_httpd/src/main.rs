@@ -90,7 +90,8 @@ async fn main() {
     // to support multiple cors origins, we'd need to have a list, and check if the request is from
     // one of them, if so, return it as the cors header.
     let cors_layer = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::CONNECT])
+        .allow_methods([Method::GET, Method::POST, Method::CONNECT, Method::OPTIONS])
+        .allow_headers(tower_http::cors::Any)
         .allow_origin(
             settings
                 .allowed_origin()
