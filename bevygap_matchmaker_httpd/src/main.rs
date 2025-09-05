@@ -22,7 +22,7 @@ use tracing_subscriber::{layer::*, util::*};
 
 mod session_request_handler;
 mod session_request_handler_ws;
-mod lobby;
+pub mod lobby;
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
@@ -67,6 +67,12 @@ pub(crate) struct AppState {
     pub(crate) bgnats: BevygapNats,
     pub(crate) settings: Settings,
     pub(crate) lobby: lobby::LobbyStore,
+}
+
+impl lobby::HasLobby for AppState {
+    fn lobby(&self) -> &lobby::LobbyStore {
+        &self.lobby
+    }
 }
 
 #[tokio::main]

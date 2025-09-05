@@ -21,5 +21,8 @@ tower-http.workspace = true
 clap.workspace = true
 async-nats.workspace = true
 
+[dev-dependencies]
+tower = "0.5"
+
 [lints]
 workspace = true
