@@ -125,6 +125,7 @@ async fn main() {
         .route("/lobby/api/rooms", get(lobby::list_rooms).post(lobby::create_room))
         .route("/lobby/api/status", get(lobby::lobby_status))
         .route("/lobby/api/rooms/:id/start", post(lobby::start_room))
+        .route("/lobby/api/rooms/:id/join", post(lobby::join_room))
         .route("/lobby/api/rooms/:id/leave", post(lobby::leave_room))
         .layer(cors_layer)
         .with_state(app_state);

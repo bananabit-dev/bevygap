@@ -63,7 +63,8 @@ pub struct RequestSession {
 impl RequestSession {
     pub fn game_name_and_version(&self) -> Result<(String, String), String> {
         let name_pattern = regex::Regex::new(r"^[a-zA-Z0-9\s_-]+$").unwrap();
-        let ver_pattern = regex::Regex::new(r"^[a-zA-Z0-9\s_-]+$").unwrap();
+        // Allow dots in versions (e.g., v0.0.1)
+        let ver_pattern = regex::Regex::new(r"^[a-zA-Z0-9._\s-]+$").unwrap();
 
         if !name_pattern.is_match(&self.game) {
             return Err("Game name invalid".to_string());

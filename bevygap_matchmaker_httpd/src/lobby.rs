@@ -91,6 +91,28 @@ pub async fn start_room(State(state): State<Arc<AppState>>, Path(id): Path<Strin
         Err((axum::http::StatusCode::NOT_FOUND, "room not found".to_string()))
     }
 }
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct JoinRoomRequest {
+    pub player_name: Option<String>,
+}
+
+pub async fn join_room(State(state): State<Arc<AppState>>, Path(id): Path<String>, Json(_req): Json<JoinRoomRequest>) -> Result<Json<LobbyRoom>, (StatusCode, String)> {
+    let mut rooms = state.lobby.rooms.lock().unwrap();
+    if let Some(room) = rooms.get_mut(&id) {
+        if room.started {
+            return Err((StatusCode::CONFLICT, "room already started".to_string()));
+        }
+        if room.current_players >= room.max_players {
+            return Err((StatusCode::CONFLICT, "room full".to_string()));
+        }
+        room.current_players += 1;
+        info!("Player joined room {}, current players {}", id, room.current_players);
+        Ok(Json(room.clone()))
+    } else {
+        Err((StatusCode::NOT_FOUND, "room not found".to_string()))
+    }
+}
 #[derive(Clone, Debug, Deserialize)]
 pub struct LeaveRoomRequest {
     pub player_name: Option<String>,
