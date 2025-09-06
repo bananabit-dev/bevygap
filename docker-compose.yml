@@ -55,7 +55,7 @@ services:
       NATS_INSECURE: "set"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.webhook.rule=PathPrefix(`/hook`)"
+      - "traefik.http.routers.webhook.rule=PathPrefix(`/hook`) && !PathPrefix(`/hook/api`)"
       - "traefik.http.services.webhook.loadbalancer.server.port=3001"
 
   bevygap_matchmaker:
@@ -95,6 +95,6 @@ services:
     command: "--cors http://127.0.0.1"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.matchmaker.rule=PathPrefix(`/matchmaker`) || PathPrefix(`/lobby`)"
+      - "traefik.http.routers.matchmaker.rule=PathPrefix(`/matchmaker`) || PathPrefix(`/lobby`) || PathPrefix(`/hook/api`)"
       - "traefik.http.services.matchmaker.loadbalancer.server.port=3000"
       - "traefik.http.services.matchmaker.loadbalancer.responseforwarding.flushinterval=-1"
