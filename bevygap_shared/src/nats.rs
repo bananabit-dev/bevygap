@@ -173,7 +173,7 @@ impl BevygapNats {
     }
 
     /// Generate list of hosts to try, including IPv6 and IPv4 variants if the host is a domain name
-    fn generate_connection_hosts(host: &str) -> Vec<(String, String)> {
+    pub fn generate_connection_hosts(host: &str) -> Vec<(String, String)> {
         let mut hosts = Vec::new();
         
         // First, try the original host as-is

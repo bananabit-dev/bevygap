@@ -15,6 +15,7 @@ The NATS connection code in `bevygap_shared` depends on the following environmen
 | NATS_PASSWORD    | Yes      | Password for NATS authentication                                                                                                                                                                                                             |
 | NATS_CA          | No       | Path to CA root certificate for self-signed certs<br><small>eg: `/path/to/rootCA.pem`</small>                                                                                                                                                |
 | NATS_CA_CONTENTS | No       | Contents of the CA file<br><small>gets written to tmp file and used as NATS_CA<br><span style="color:red">255 byte limit on edgegap for ENVS<br>see note about <code>set-caroot-argument.sh</code> in 'Edgegap Setup' section</span></small> |
+| NATSRETRYCOUNT   | No       | Number of connection retry attempts<br><small>Defaults to 3. Supports IPv6/IPv4 fallback for domain names.</small>                                                                                                                          |
 
 
 ### Create nats.env file
