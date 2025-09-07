@@ -2,6 +2,7 @@ use async_nats::jetstream::stream::Stream;
 use async_nats::jetstream::{self, stream};
 use async_nats::Client;
 use std::time::Duration;
+use std::net::{SocketAddr, ToSocketAddrs};
 
 use log::*;
 
@@ -93,11 +94,6 @@ impl BevygapNats {
 
         let nats_insecure = std::env::var("NATS_INSECURE").is_ok();
         let nats_self_signed_ca: Option<String> = std::env::var("NATS_CA").ok().or_else(|| {
-            // we write out the CA to a temp file, if provided in NATS_CA_CONTENTS
-            // this is useful for deploying containers on edgegap and injecting CA root certs.
-            //
-            // However, as of 5 November 2024, Edgegap limits you to 255 bytes in ENV vars
-            // so this is actually set by the server, from a command line arg.. see the book!
             if let Ok(ca_contents) = std::env::var("NATS_CA_CONTENTS") {
                 let sanitised_nats_client_name = nats_client_name
                     .chars()
@@ -115,6 +111,10 @@ impl BevygapNats {
         let nats_host = std::env::var("NATS_HOST").expect("Missing NATS_HOST env");
         let nats_user = std::env::var("NATS_USER").expect("Missing NATS_USER env");
         let nats_pass = std::env::var("NATS_PASSWORD").expect("Missing NATS_PASSWORD env");
+        let nats_retry_count = std::env::var("NATSRETRYCOUNT")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(3);
 
         if nats_insecure {
             warn!("😬 NATS: insecure - TLS is disabled.");
@@ -122,46 +122,120 @@ impl BevygapNats {
             info!("NATS: TLS is enabled");
         }
 
-        info!("NATS: connecting as '{nats_user}' to {nats_host}");
+        info!("NATS: connecting as '{nats_user}' to {nats_host} with retry count: {nats_retry_count}");
 
-        let mut nats_connection = async_nats::ConnectOptions::new()
-            .name(nats_client_name)
-            .user_and_password(nats_user, nats_pass)
-            .max_reconnects(10)
-            .require_tls(!nats_insecure);
+        // Try the original approach first, then implement retry logic
+        let hosts_to_try = Self::generate_connection_hosts(&nats_host);
+        let mut last_error: Option<async_nats::Error> = None;
 
-        if let Some(ca) = nats_self_signed_ca {
-            info!("NATS: using self-signed CA: {}", ca);
-            nats_connection = nats_connection.add_root_certificates(ca.into());
-        } else {
-            info!("NATS: expecting a trusted cert, no self-signed CA provided.");
+        for retry_attempt in 0..nats_retry_count {
+            info!("NATS: connection attempt {} of {}", retry_attempt + 1, nats_retry_count);
+
+            for (host_description, host_to_try) in &hosts_to_try {
+                info!("NATS: trying connection to {} ({})", host_to_try, host_description);
+                
+                // Create fresh connection options for each attempt
+                let mut connection_opts = async_nats::ConnectOptions::new()
+                    .name(nats_client_name)
+                    .user_and_password(nats_user.clone(), nats_pass.clone())
+                    .max_reconnects(10)
+                    .require_tls(!nats_insecure);
+
+                if let Some(ref ca) = nats_self_signed_ca {
+                    connection_opts = connection_opts.add_root_certificates(ca.clone().into());
+                }
+
+                match connection_opts.connect(host_to_try).await {
+                    Ok(client) => {
+                        info!("🟢 NATS: connected OK to {} ({})", host_to_try, host_description);
+                        return Ok(client);
+                    }
+                    Err(e) => {
+                        warn!("NATS: connection failed to {} ({}): {}", host_to_try, host_description, e);
+                        last_error = Some(Box::new(e) as async_nats::Error);
+                    }
+                }
+            }
+
+            if retry_attempt < nats_retry_count - 1 {
+                let delay_ms = 1000 * (retry_attempt + 1) as u64;
+                info!("NATS: waiting {}ms before next retry", delay_ms);
+                std::thread::sleep(Duration::from_millis(delay_ms));
+            }
         }
 
-        let client = nats_connection.connect(nats_host).await?;
-        info!("🟢 NATS: connected OK");
-        Ok(client)
+        error!("NATS: all connection attempts failed after {} retries", nats_retry_count);
+        // Return the last error we got, converting the type as needed
+        Err(last_error.unwrap_or_else(|| {
+            let io_error = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "All connection attempts failed");
+            Box::new(io_error) as async_nats::Error
+        }))
+    }
 
-        // if let Some(ca) = nats_self_signed_ca {
-        //     info!("NATS_SELF_SIGNED_CA: {}", ca);
-        //     let nats_ca = std::env::var("NATS_CA").unwrap_or("./config/rootCA.pem".to_string());
-        // }
-        // let nats_cert =
-        // std::env::var("NATS_CERT").unwrap_or("./config/client-cert.pem".to_string());
-        // let nats_key = std::env::var("NATS_KEY").unwrap_or("./config/client-key.pem".to_string());
-
-        // info!("NATS_CA: {}", nats_ca);
-        // info!("NATS_CERT: {}", nats_cert);
-        // info!("NATS_KEY: {}", nats_key);
-
-        // let client = async_nats::ConnectOptions::new()
-        //     .name(nats_client_name)
-        //     .user_and_password(nats_user, nats_pass)
-        //     .max_reconnects(10)
-        //     .require_tls(!insecure)
-        //     // .add_root_certificates(nats_ca.into())
-        //     // .add_client_certificate(nats_cert.into(), nats_key.into())
-        //     .connect(nats_host)
-        //     .await?;
+    /// Generate list of hosts to try, including IPv6 and IPv4 variants if the host is a domain name
+    fn generate_connection_hosts(host: &str) -> Vec<(String, String)> {
+        let mut hosts = Vec::new();
+        
+        // First, try the original host as-is
+        hosts.push(("original".to_string(), host.to_string()));
+        
+        // If the host contains a port, separate it
+        let (hostname, port) = if let Some(colon_pos) = host.rfind(':') {
+            let potential_port = &host[colon_pos + 1..];
+            if potential_port.parse::<u16>().is_ok() {
+                (&host[..colon_pos], Some(&host[colon_pos..]))
+            } else {
+                (host, None)
+            }
+        } else {
+            (host, None)
+        };
+        
+        // Try to resolve hostname to get IPv6 and IPv4 addresses
+        // We'll use a dummy port for resolution if none is provided
+        let resolve_host = if port.is_some() {
+            host.to_string()
+        } else {
+            format!("{}:4222", hostname) // Use default NATS port for resolution
+        };
+        
+        if let Ok(addrs) = resolve_host.to_socket_addrs() {
+            let mut ipv6_addrs = Vec::new();
+            let mut ipv4_addrs = Vec::new();
+            
+            for addr in addrs {
+                match addr {
+                    SocketAddr::V6(_) => ipv6_addrs.push(addr),
+                    SocketAddr::V4(_) => ipv4_addrs.push(addr),
+                }
+            }
+            
+            // Add IPv6 addresses first (prefer IPv6)
+            for addr in ipv6_addrs {
+                let host_str = if port.is_some() {
+                    addr.to_string()
+                } else {
+                    format!("[{}]", addr.ip())
+                };
+                hosts.push(("IPv6".to_string(), host_str));
+            }
+            
+            // Then add IPv4 addresses as fallback
+            for addr in ipv4_addrs {
+                let host_str = if port.is_some() {
+                    addr.to_string()
+                } else {
+                    addr.ip().to_string()
+                };
+                hosts.push(("IPv4".to_string(), host_str));
+            }
+        }
+        
+        // Remove duplicates while preserving order
+        let mut seen = std::collections::HashSet::new();
+        hosts.retain(|(_, host)| seen.insert(host.clone()));
+        
+        hosts
     }
 
     pub async fn create_kv_active_connections(
