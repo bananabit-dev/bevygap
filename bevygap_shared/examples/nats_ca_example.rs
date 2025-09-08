@@ -1,5 +1,6 @@
 use bevygap_shared::nats::*;
 use tracing_subscriber::{layer::*, util::*};
+use futures_util::stream::StreamExt;
 
 #[tokio::main]
 async fn main() {
@@ -48,16 +49,42 @@ async fn main() {
     }
     
     println!();
-    println!("🔌 Attempting to connect to NATS server...");
+    println!("🔌 Testing basic NATS connection...");
     
-    // Attempt the connection
-    match BevygapNats::new_and_connect("bevygap_ca_example").await {
-        Ok(_nats) => {
-            println!("✅ SUCCESS: Connected to NATS server with TLS verification!");
+    // First test basic NATS connection
+    match BevygapNats::test_basic_connection("bevygap_ca_example").await {
+        Ok(client) => {
+            println!("✅ SUCCESS: Basic NATS connection established with TLS verification!");
             println!("   Your CA certificate configuration is working correctly.");
+            
+            // Test Jetstream functionality
+            println!();
+            println!("🗄️  Testing Jetstream functionality...");
+            
+            match BevygapNats::new_and_connect("bevygap_ca_example").await {
+                Ok(_nats) => {
+                    println!("✅ SUCCESS: Full Jetstream setup completed!");
+                    println!("   All NATS functionality is working correctly.");
+                }
+                Err(e) => {
+                    println!("⚠️  WARNING: Basic NATS works but Jetstream setup failed");
+                    println!("   Error: {}", e);
+                    println!();
+                    println!("🔧 Jetstream troubleshooting:");
+                    println!("• Check if Jetstream is enabled on your NATS server");
+                    println!("• Verify the user has permission to create streams and KV stores");
+                    println!("• For NATS server config, add: jetstream {{ store_dir: \"/tmp/nats\" }}");
+                    println!("• Check server logs for Jetstream-related errors");
+                }
+            }
+            
+            // Perform a basic publish/subscribe test
+            println!();
+            println!("📡 Testing basic pub/sub functionality...");
+            test_basic_pubsub(&client).await;
         }
         Err(e) => {
-            println!("❌ FAILED: Could not connect to NATS server");
+            println!("❌ FAILED: Could not establish basic NATS connection");
             println!("   Error: {}", e);
             println!();
             print_troubleshooting_guide(&e);
@@ -174,4 +201,42 @@ fn print_troubleshooting_guide(error: &dyn std::fmt::Display) {
     println!("• Enable debug logging: RUST_LOG=debug");
     println!("• Test with nats-cli first to verify server connectivity");
     println!("• Check NATS server logs for additional error details");
+}
+
+async fn test_basic_pubsub(client: &async_nats::Client) {
+    let test_subject = "bevygap.test.connectivity";
+    let test_message = "Hello from bevygap diagnostic tool!";
+    
+    // Subscribe to test subject
+    match client.subscribe(test_subject).await {
+        Ok(mut subscription) => {
+            // Publish test message
+            match client.publish(test_subject, test_message.into()).await {
+                Ok(_) => {
+                    // Try to receive the message with timeout
+                    match tokio::time::timeout(std::time::Duration::from_secs(2), subscription.next()).await {
+                        Ok(Some(msg)) => {
+                            if std::str::from_utf8(&msg.payload).unwrap_or("") == test_message {
+                                println!("✅ SUCCESS: Basic pub/sub test passed!");
+                            } else {
+                                println!("⚠️  WARNING: Pub/sub test received unexpected message");
+                            }
+                        }
+                        Ok(None) => {
+                            println!("⚠️  WARNING: Pub/sub subscription closed unexpectedly");
+                        }
+                        Err(_) => {
+                            println!("⚠️  WARNING: Pub/sub test timed out (message delivery may be delayed)");
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("⚠️  WARNING: Failed to publish test message: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("⚠️  WARNING: Failed to subscribe to test subject: {}", e);
+        }
+    }
 }

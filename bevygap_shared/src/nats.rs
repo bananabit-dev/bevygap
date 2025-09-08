@@ -22,13 +22,74 @@ const DELETE_SESSION_STREAM: &str = "edgegap_delete_session_q";
 
 impl BevygapNats {
     /// Connects to NATS based on environment variables.
+    /// 
+    /// This method performs a complete setup including Jetstream key-value stores.
+    /// If you only need to test basic NATS connectivity, use `connect_to_nats()` directly.
     pub async fn new_and_connect(nats_client_name: &str) -> Result<Self, async_nats::Error> {
         let client = Self::connect_to_nats(nats_client_name).await?;
-        let (kv_s2c, kv_c2s) = Self::create_kv_buckets_for_session_mappings(client.clone()).await?;
-        let kv_active_connections = Self::create_kv_active_connections(client.clone()).await?;
-        let kv_cert_digests = Self::create_kv_cert_digests(client.clone()).await?;
-        let kv_unclaimed_sessions = Self::create_kv_unclaimed_sessions(client.clone()).await?;
-        let delete_session_stream = Self::create_session_delete_queue(&client).await?;
+        
+        // Test Jetstream availability before proceeding
+        info!("NATS: Testing Jetstream availability...");
+        let jetstream = jetstream::new(client.clone());
+        
+        // Try to create a simple test operation to verify Jetstream is working
+        let test_bucket_name = format!("test_connectivity_{}", 
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+        
+        match jetstream.create_key_value(async_nats::jetstream::kv::Config {
+            bucket: test_bucket_name.clone(),
+            ..Default::default()
+        }).await {
+            Ok(_kv) => {
+                info!("NATS: Jetstream is available and working");
+                // Clean up test bucket
+                if let Err(e) = jetstream.delete_key_value(&test_bucket_name).await {
+                    warn!("NATS: Failed to clean up test bucket (this is normal if server doesn't support deletion): {}", e);
+                }
+            }
+            Err(e) => {
+                error!("NATS: Jetstream is not available or not enabled: {}", e);
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Jetstream is required but not available: {}. Please enable Jetstream on your NATS server.", e)
+                )));
+            }
+        }
+        
+        // Create Jetstream resources with retry logic
+        info!("NATS: Creating Jetstream key-value stores...");
+        let (kv_s2c, kv_c2s) = Self::create_kv_buckets_for_session_mappings(client.clone()).await
+            .map_err(|e| {
+                error!("NATS: Failed to create session mapping KV stores: {}", e);
+                e
+            })?;
+            
+        let kv_active_connections = Self::create_kv_active_connections(client.clone()).await
+            .map_err(|e| {
+                error!("NATS: Failed to create active connections KV store: {}", e);
+                e
+            })?;
+            
+        let kv_cert_digests = Self::create_kv_cert_digests(client.clone()).await
+            .map_err(|e| {
+                error!("NATS: Failed to create cert digests KV store: {}", e);
+                e
+            })?;
+            
+        let kv_unclaimed_sessions = Self::create_kv_unclaimed_sessions(client.clone()).await
+            .map_err(|e| {
+                error!("NATS: Failed to create unclaimed sessions KV store: {}", e);
+                e
+            })?;
+            
+        let delete_session_stream = Self::create_session_delete_queue(&client).await
+            .map_err(|e| {
+                error!("NATS: Failed to create delete session stream: {}", e);
+                e
+            })?;
+            
+        info!("NATS: Successfully created all Jetstream resources");
+        
         Ok(Self {
             client,
             kv_s2c,
@@ -38,6 +99,12 @@ impl BevygapNats {
             kv_unclaimed_sessions,
             delete_session_stream,
         })
+    }
+    
+    /// Test only the basic NATS connection without Jetstream functionality.
+    /// This is useful for diagnostic purposes and environments where Jetstream is not available.
+    pub async fn test_basic_connection(nats_client_name: &str) -> Result<Client, async_nats::Error> {
+        Self::connect_to_nats(nats_client_name).await
     }
 
     pub fn client(&self) -> Client {
