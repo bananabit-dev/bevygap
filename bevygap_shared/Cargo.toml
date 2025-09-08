@@ -18,6 +18,7 @@ async-nats = { workspace = true, optional = true }
 log.workspace = true
 serde.workspace = true
 regex.workspace = true
+rustls-pemfile = "2.2.0"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

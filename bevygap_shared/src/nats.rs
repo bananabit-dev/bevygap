@@ -93,20 +93,8 @@ impl BevygapNats {
         info!("NATS: setting up, client name: {nats_client_name}");
 
         let nats_insecure = std::env::var("NATS_INSECURE").is_ok();
-        let nats_self_signed_ca: Option<String> = std::env::var("NATS_CA").ok().or_else(|| {
-            if let Ok(ca_contents) = std::env::var("NATS_CA_CONTENTS") {
-                let sanitised_nats_client_name = nats_client_name
-                    .chars()
-                    .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
-                    .collect::<String>();
-                let tmp_file =
-                    std::env::temp_dir().join(format!("rootCA-{sanitised_nats_client_name}.pem"));
-                std::fs::write(&tmp_file, ca_contents).unwrap();
-                Some(tmp_file.to_string_lossy().to_string())
-            } else {
-                None
-            }
-        });
+        let nats_self_signed_ca: Option<String> = std::env::var("NATS_CA").ok();
+        let nats_ca_contents: Option<String> = std::env::var("NATS_CA_CONTENTS").ok();
 
         let nats_host = std::env::var("NATS_HOST").expect("Missing NATS_HOST env");
         let nats_user = std::env::var("NATS_USER").expect("Missing NATS_USER env");
@@ -142,7 +130,32 @@ impl BevygapNats {
                     .require_tls(!nats_insecure)
                     .retry_on_initial_connect();
 
-                if let Some(ref ca) = nats_self_signed_ca {
+                // Handle TLS certificate configuration
+                if let Some(ref ca_contents) = nats_ca_contents {
+                    // Use certificate contents directly with custom TLS config
+                    match Self::create_tls_client_config_from_contents(ca_contents) {
+                        Ok(tls_config) => {
+                            info!("NATS: Using TLS config from certificate contents");
+                            connection_opts = connection_opts.tls_client_config(tls_config);
+                        }
+                        Err(e) => {
+                            warn!("NATS: Failed to create TLS config from certificate contents: {}", e);
+                            // Fall back to writing temp file if direct approach fails
+                            let sanitised_nats_client_name = nats_client_name
+                                .chars()
+                                .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+                                .collect::<String>();
+                            let tmp_file = std::env::temp_dir().join(format!("rootCA-{sanitised_nats_client_name}.pem"));
+                            if std::fs::write(&tmp_file, ca_contents).is_ok() {
+                                connection_opts = connection_opts.add_root_certificates(tmp_file);
+                                info!("NATS: Using TLS config from temporary file fallback");
+                            } else {
+                                warn!("NATS: Failed to write temporary certificate file");
+                            }
+                        }
+                    }
+                } else if let Some(ref ca) = nats_self_signed_ca {
+                    // Use file path approach for backward compatibility
                     connection_opts = connection_opts.add_root_certificates(ca.clone().into());
                 }
 
@@ -237,6 +250,31 @@ impl BevygapNats {
         hosts.retain(|(_, host)| seen.insert(host.clone()));
         
         hosts
+    }
+
+    /// Create a TLS client config from certificate contents
+    fn create_tls_client_config_from_contents(ca_contents: &str) -> Result<async_nats::rustls::ClientConfig, Box<dyn std::error::Error + Send + Sync>> {
+        use async_nats::rustls;
+        
+        // Create a root certificate store
+        let mut root_store = rustls::RootCertStore::empty();
+        
+        // Parse the PEM certificate(s)
+        let mut reader = ca_contents.as_bytes();
+        let pem_certs: Result<Vec<_>, _> = rustls_pemfile::certs(&mut reader).collect();
+        let pem_certs = pem_certs?;
+        
+        // Add each certificate to the root store
+        for cert in pem_certs {
+            root_store.add(cert)?;
+        }
+        
+        // Create the TLS client configuration
+        let config = rustls::ClientConfig::builder()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+        
+        Ok(config)
     }
 
     pub async fn create_kv_active_connections(
