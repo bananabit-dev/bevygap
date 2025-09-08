@@ -115,4 +115,19 @@ The workspace generates various "dead code" warnings - this is normal for librar
 - **mdbook build**: <1 second (markdown to HTML)
 - **Docker builds**: 20+ minutes (rebuilds everything in container)
 
+### Critical Validation Scenarios
+After making any changes, always test these scenarios:
+1. **Basic compilation**: `cargo check` to catch syntax/type errors quickly
+2. **Full workspace build**: `cargo build` to ensure all dependencies resolve
+3. **Test suite**: `cargo test` to verify existing functionality
+4. **Binary functionality**: `./target/debug/bevygap_matchmaker_httpd --help` to test CLI
+5. **Example integration**: `cd examples/snake_multiplayer && cargo check` to validate game integration patterns
+
+### End-to-End Testing
+When possible, verify the complete flow:
+1. Build all services with `cargo build`
+2. Test that help commands work for key binaries
+3. Validate that documentation builds with `mdbook build`
+4. Check that example projects compile successfully
+
 Remember: NEVER CANCEL long-running builds. Bevy projects with complex dependencies require substantial compilation time. Set generous timeouts and let builds complete.
