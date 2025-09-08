@@ -29,10 +29,11 @@ async fn main() {
     let ca_config = check_ca_configuration();
     match ca_config {
         CaConfig::SystemTrustStore => {
-            println!("📋 CA Configuration: Using system trust store (suitable for LetsEncrypt/trusted CAs)");
+            println!("📋 CA Configuration: Using system trust store (recommended for LetsEncrypt certificates)");
         }
         CaConfig::FilePath(path) => {
-            println!("📋 CA Configuration: Using CA certificate file: {}", path);
+            println!("📋 CA Configuration: Using deprecated CA certificate file: {}", path);
+            println!("   ⚠️  Consider migrating to LetsEncrypt certificates");
             if !std::path::Path::new(&path).exists() {
                 println!("❌ ERROR: CA certificate file does not exist: {}", path);
                 println!("   Please ensure the file exists and is readable.");
@@ -40,7 +41,8 @@ async fn main() {
             }
         }
         CaConfig::Contents(len) => {
-            println!("📋 CA Configuration: Using CA certificate contents ({} bytes)", len);
+            println!("📋 CA Configuration: Using deprecated CA certificate contents ({} bytes)", len);
+            println!("   ⚠️  Consider migrating to LetsEncrypt certificates");
         }
         CaConfig::Insecure => {
             println!("⚠️  CA Configuration: TLS verification DISABLED (insecure mode)");
@@ -137,14 +139,16 @@ fn print_usage(missing_vars: &[String]) {
     println!("  NATS_USER=<username>        # e.g., matchmaker");
     println!("  NATS_PASSWORD=<password>    # e.g., your_secure_password");
     println!();
-    println!("Optional environment variables for CA certificate configuration:");
+    println!("🔒 TLS Configuration:");
+    println!("With LetsEncrypt certificates (recommended):");
+    println!("  # No additional variables needed - system trust store will be used automatically");
     println!();
-    println!("For self-signed certificates (choose ONE option):");
-    println!("  NATS_CA=/path/to/rootCA.pem              # Path to CA certificate file");
-    println!("  NATS_CA_CONTENTS=\"$(cat rootCA.pem)\"      # CA certificate contents");
+    println!("Legacy options (deprecated):");
+    println!("  NATS_CA=/path/to/rootCA.pem              # Path to CA certificate file (deprecated)");
+    println!("  NATS_CA_CONTENTS=\"$(cat rootCA.pem)\"      # CA certificate contents (deprecated)");
     println!();
-    println!("For trusted certificates (LetsEncrypt, etc.):");
-    println!("  # No additional variables needed - system trust store will be used");
+    println!("Development only:");
+    println!("  NATS_INSECURE=1                          # Disable TLS verification (not recommended)");
     println!();
     println!("For development/testing only:");
     println!("  NATS_INSECURE=1                          # Disable TLS verification (NOT RECOMMENDED)");
@@ -167,15 +171,17 @@ fn print_troubleshooting_guide(error: &dyn std::fmt::Display) {
         println!("This appears to be a TLS certificate verification error.");
         println!();
         println!("Common causes and solutions:");
-        println!("1. Self-signed certificate without CA configuration:");
+        println!("1. With LetsEncrypt certificates (recommended):");
+        println!("   → Ensure your NATS server has valid LetsEncrypt certificates");
+        println!("   → Check that certificates are not expired");
+        println!("   → Verify the domain name matches the certificate");
+        println!();
+        println!("2. Legacy self-signed certificate setup (deprecated):");
         println!("   → Set NATS_CA=/path/to/rootCA.pem (the CA that signed your server cert)");
         println!("   → Or set NATS_CA_CONTENTS with the certificate contents");
+        println!("   → Consider migrating to LetsEncrypt certificates instead");
         println!();
-        println!("2. Wrong CA certificate:");
-        println!("   → Ensure you're using the CA that signed your NATS server certificate");
-        println!("   → For mkcert: Use the rootCA.pem from $(mkcert -CAROOT)");
-        println!();
-        println!("3. File permission or path issues:");
+        println!("3. File permission or path issues (for legacy setups):");
         println!("   → Check that the CA file exists and is readable");
         println!("   → Verify the file path is correct");
         println!();
