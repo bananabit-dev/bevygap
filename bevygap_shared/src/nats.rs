@@ -263,8 +263,7 @@ impl BevygapNats {
                     .name(nats_client_name)
                     .user_and_password(nats_user.clone(), nats_pass.clone())
                     .max_reconnects(10)
-                    .require_tls(!nats_insecure)
-                    .retry_on_initial_connect();
+                    .require_tls(!nats_insecure);
 
                 // Configure TLS with custom root CA certificate if provided
                 // This is essential for connecting to NATS servers with self-signed certificates
