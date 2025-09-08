@@ -21,6 +21,27 @@ Documentation by book: [The Bevygap Book](https://bananabit-dev.github.io/bevyga
 
 `mdbook serve -o book/` if you want to view it locally.
 
+## Quick NATS TLS Setup Test
+
+If you're experiencing TLS certificate issues with NATS connections, use the built-in diagnostic tool:
+
+```bash
+# Set your NATS connection details
+export NATS_HOST="your-nats-server.com:4222"
+export NATS_USER="your-username"
+export NATS_PASSWORD="your-password"
+
+# For self-signed certificates, add the CA:
+export NATS_CA="/path/to/rootCA.pem"
+# OR
+export NATS_CA_CONTENTS="$(cat /path/to/rootCA.pem)"
+
+# Run the diagnostic example
+cargo run -p bevygap_shared --example nats_ca_example
+```
+
+This tool will validate your configuration and provide specific troubleshooting guidance for common TLS certificate issues.
+
 
 ## Connection flow
 
