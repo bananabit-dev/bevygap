@@ -27,9 +27,50 @@ impl Plugin for BevygapServerPlugin {
         let arb_env = ArbitriumEnv::from_env().expect("Failed to read Arbitrium ENVs");
         app.insert_resource(arb_env);
 
-        // When using a self-signed cert for your NATS server, the server needs the root CA .pem file
-        // in order to verify the server's certificate. Since this file is around 2kB, and Edgegap
-        // limits you to 255 bytes in ENV vars, we set this from a command line arg instead.
+        // Legacy CA certificate injection from command line (deprecated)
+        // Note: With LetsEncrypt certificates, this is no longer needed
+        // Kept for compatibility with existing Edgegap deployments
+        inject_ca_root_env_var_from_cmdline_arg();
+
+        app.add_systems(Startup, extract_cert_digest);
+
+        app.add_systems(Startup, extract_cert_digest);
+        app.add_systems(Startup, setup_nats);
+
+        app.add_observer(edgegap_context::fetch_context_on_nats_connected);
+        app.add_observer(send_context_to_nats);
+        app.add_observer(setup_connection_request_handler);
+    }
+}
+
+
+/// Legacy function for CA certificate injection from command line (deprecated)
+/// If --ca_contents XXXXXX present on command line, set NATS_CA_CONTENTS to XXXXXX
+/// Note: With LetsEncrypt certificates, this is no longer needed
+fn inject_ca_root_env_var_from_cmdline_arg() {
+    use std::env;
+    let args: Vec<_> = env::args().collect();
+    if args.len() < 2 {
+        return;
+    }
+    let mut found_flag = false;
+    for arg in args {
+        if found_flag {
+            let ca_root = arg.clone();
+            warn!(
+                "Found deprecated --ca_contents flag, setting NATS_CA_CONTENTS to [{} bytes]. Consider using LetsEncrypt certificates instead.",
+                ca_root.len()
+            );
+            env::set_var("NATS_CA_CONTENTS", ca_root);
+            return;
+        }
+        if arg == "--ca_contents" {
+            found_flag = true;
+            continue;
+        }
+    }
+}
+
 fn extract_cert_digest(
     q: Query<&lightyear::webtransport::server::WebTransportServerIo>,
     mut commands: Commands,
@@ -48,46 +89,6 @@ fn extract_cert_digest(
     }
 }
 
-        // (Edgegap have a bug report in the backlog to increase this limit)
-        //
-        // If present, we write the contents to an ENV var, which is later read by setup_nats().
-        // In future, we hope to just set this ENV var directly in the Edgegap Dashboard.
-        inject_ca_root_env_var_from_cmdline_arg();
-
-        app.add_systems(Startup, extract_cert_digest);
-        app.add_systems(Startup, setup_nats);
-
-        app.add_observer(edgegap_context::fetch_context_on_nats_connected);
-        app.add_observer(send_context_to_nats);
-        app.add_observer(setup_connection_request_handler);
-    }
-}
-
-
-/// If --ca_contents XXXXXX present on command line, set NATS_CA_CONTENTS to XXXXXX
-fn inject_ca_root_env_var_from_cmdline_arg() {
-    use std::env;
-    let args: Vec<_> = env::args().collect();
-    if args.len() < 2 {
-        return;
-    }
-    let mut found_flag = false;
-    for arg in args {
-        if found_flag {
-            let ca_root = arg.clone();
-            info!(
-                "Found --ca_contents, setting NATS_CA_CONTENTS to [{} bytes]",
-                ca_root.len()
-            );
-            env::set_var("NATS_CA_CONTENTS", ca_root);
-            return;
-        }
-        if arg == "--ca_contents" {
-            found_flag = true;
-            continue;
-        }
-    }
-}
 #[derive(Event)]
 pub struct BevygapReady;
 

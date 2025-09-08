@@ -2,17 +2,15 @@
 
 Now that `nats-cli` can connect to your NATS server, and we know it's working, let's ensure that the bevygap code can connect too.
 
-### Root CA Certificate Loading for TLS Connections
+### TLS Certificate Verification with LetsEncrypt
 
-When connecting to a NATS server with self-signed certificates, the client must be able to verify the server's certificate. This requires loading the root CA certificate that was used to sign the server's certificate.
+Bevygap now uses LetsEncrypt certificates for secure NATS connections. LetsEncrypt certificates are automatically trusted by the system, so no additional CA certificate configuration is required.
 
-**Common Error:** If you see "unknown certificate authority" or TLS handshake errors, it means the NATS client cannot verify the server's certificate because it doesn't trust the CA that signed it.
-
-**Solution:** Provide the root CA certificate to the Bevygap NATS client using one of the environment variables described below.
+**If you encounter TLS handshake errors**, ensure your NATS server is configured with valid LetsEncrypt certificates and that the certificates are not expired.
 
 ### Bevygap Required Environment Variables
 
-`bevygap_matchmaker`, `bevygap_httpd`,and the gameservers (via `bevygap_server_plugin`) need to connect to NATS.
+`bevygap_matchmaker`, `bevygap_httpd`, and the gameservers (via `bevygap_server_plugin`) need to connect to NATS.
 
 The NATS connection code in `bevygap_shared` depends on the following environment variables to set up the NATS connection.
 
@@ -21,32 +19,36 @@ The NATS connection code in `bevygap_shared` depends on the following environmen
 | NATS_HOST        | Yes      | NATS server address<br><small>eg: `nats.example.com:4222` or `1.2.3.4`</small>                                                                                                                                                               |
 | NATS_USER        | Yes      | Username for NATS authentication                                                                                                                                                                                                             |
 | NATS_PASSWORD    | Yes      | Password for NATS authentication                                                                                                                                                                                                             |
-| NATS_CA          | No       | Path to CA root certificate for self-signed certs<br><small>eg: `/path/to/rootCA.pem`<br>**Use this when the CA file is already on the filesystem**</small>                                                                                |
-| NATS_CA_CONTENTS | No       | Contents of the CA file as a string<br><small>**Use this when you need to pass the CA certificate contents directly**<br>Gets written to tmp file and used as NATS_CA<br><span style="color:red">255 byte limit on edgegap for ENVS<br>see note about <code>set-caroot-argument.sh</code> in 'Edgegap Setup' section</span></small> |
 | NATS_INSECURE    | No       | Disable TLS entirely (any value)<br><small>**Not recommended for production**</small>                                                                                                                                                       |
 | NATSRETRYCOUNT   | No       | Number of connection retry attempts<br><small>Defaults to 3. Supports IPv6/IPv4 fallback for domain names.</small>                                                                                                                          |
 
-### How Root CA Certificate Loading Works
+### Legacy Variables (Deprecated)
 
-The Bevygap NATS client automatically handles CA certificate loading based on the environment variables:
+The following variables were used for self-signed certificates but are now deprecated since LetsEncrypt certificates are used:
 
-1. **If `NATS_CA` is set:** The client loads the CA certificate from the specified file path
-2. **If `NATS_CA_CONTENTS` is set:** The client writes the certificate contents to a temporary file and loads it
-3. **If neither is set:** The client relies on the system's trusted CA store (suitable for LetsEncrypt certificates)
-4. **If `NATS_INSECURE` is set:** TLS verification is disabled entirely (not recommended)
+| Variable         | Status | Description |
+| ---------------- | ------ | ----------- |
+| NATS_CA          | **Deprecated** | Path to CA root certificate<br><small>No longer needed with LetsEncrypt certificates</small> |
+| NATS_CA_CONTENTS | **Deprecated** | Contents of the CA file as a string<br><small>No longer needed with LetsEncrypt certificates</small> |
 
-### Alternative Method: Command Line Arguments (Edgegap/Container Deployments)
+### How TLS Certificate Verification Works
 
-For containerized deployments where environment variable size is limited (like Edgegap's 255-byte limit), you can pass the CA certificate contents as a command line argument:
+The Bevygap NATS client automatically handles certificate verification:
+
+1. **LetsEncrypt certificates (recommended):** The client uses the system's trusted CA store for verification
+2. **Legacy CA support:** If `NATS_CA` or `NATS_CA_CONTENTS` is set, custom CA certificates are still supported (deprecated)
+3. **Insecure mode:** If `NATS_INSECURE` is set, TLS verification is disabled entirely (not recommended)
+
+### Legacy Support: Command Line Arguments (Deprecated)
+
+For legacy deployments that still use custom CA certificates, the old method of passing CA certificate contents as command line arguments is still supported but deprecated:
 
 ```bash
-# For gameservers using bevygap_server_plugin
+# For gameservers using bevygap_server_plugin (deprecated)
 ./your_gameserver --ca_contents "$(cat /path/to/rootCA.pem)"
 ```
 
-This method is automatically handled by the `bevygap_server_plugin` and internally sets the `NATS_CA_CONTENTS` environment variable.
-
-**Note:** This is particularly useful for Edgegap deployments where environment variables are size-constrained, but command line arguments can handle larger certificate files (~2KB).
+**Note:** This method is deprecated since LetsEncrypt certificates are now used. The system trust store automatically handles certificate verification for trusted certificates.
 
 
 ### Create nats.env file
