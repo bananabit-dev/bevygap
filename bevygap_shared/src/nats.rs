@@ -77,32 +77,84 @@ impl BevygapNats {
         Ok(())
     }
 
-    /// want to support multiple connection modes. In production, I have a domain name with
-    /// LetsEncrypt certs set up, so i just need to enable TLS and provide user/pass.
-    ///
-    /// In other scenarios I want to support self-signed certs, in which case we need to provide
-    /// the CA, so our NATS client can verify the server.
-    ///
-    /// TLS is assumed, and by default we expect a trusted (LetsEncrypt or similar) cert.
-    /// if the NATS_CA=/path/to/ca.pem env is set, we use that CA to verify the cert.
-    ///
-    /// If NATS_CA_CONTENTS is set, we write it to a temp file and use that as the CA.
-    ///
-    /// Setting NATS_INSECURE env var (to anything) will disable TLS entirely (still need user/pass)
+    /// Connects to NATS with TLS certificate verification support.
+    /// 
+    /// This method supports multiple connection modes for different deployment scenarios:
+    /// 
+    /// ## Production Mode (Trusted Certificates)
+    /// For servers with trusted certificates (e.g., LetsEncrypt):
+    /// - Set `NATS_HOST`, `NATS_USER`, `NATS_PASSWORD`
+    /// - TLS verification uses the system's trusted CA store
+    /// 
+    /// ## Self-Signed Certificate Mode
+    /// For servers with self-signed certificates, you must provide the root CA:
+    /// 
+    /// ### Option 1: CA File Path
+    /// ```bash
+    /// export NATS_CA="/path/to/rootCA.pem"
+    /// ```
+    /// The certificate file must be accessible on the filesystem.
+    /// 
+    /// ### Option 2: CA Contents (useful for containers/embedded deployments)
+    /// ```bash
+    /// export NATS_CA_CONTENTS="$(cat /path/to/rootCA.pem)"
+    /// ```
+    /// The certificate contents are written to a temporary file and loaded.
+    /// 
+    /// ## Insecure Mode (Development Only)
+    /// Disable TLS verification entirely:
+    /// ```bash
+    /// export NATS_INSECURE=1
+    /// ```
+    /// ⚠️ **WARNING:** Not recommended for production use.
+    /// 
+    /// ## Troubleshooting
+    /// If you see "unknown certificate authority" errors:
+    /// 1. Verify the CA certificate file exists and is readable
+    /// 2. Ensure the CA certificate is the one that signed your NATS server certificate
+    /// 3. Check file permissions and paths
+    /// 4. Enable debug logging with `RUST_LOG=debug`
+    /// 
+    /// ## Environment Variables
+    /// - `NATS_HOST`: Server address (required)
+    /// - `NATS_USER`: Username (required)  
+    /// - `NATS_PASSWORD`: Password (required)
+    /// - `NATS_CA`: Path to CA certificate file (optional)
+    /// - `NATS_CA_CONTENTS`: CA certificate contents (optional)
+    /// - `NATS_INSECURE`: Disable TLS verification (optional)
+    /// - `NATSRETRYCOUNT`: Connection retry attempts, default 3 (optional)
     async fn connect_to_nats(nats_client_name: &str) -> Result<Client, async_nats::Error> {
         info!("NATS: setting up, client name: {nats_client_name}");
 
         let nats_insecure = std::env::var("NATS_INSECURE").is_ok();
+        
+        // Load root CA certificate for TLS verification with self-signed certificates
+        // This supports two methods:
+        // 1. NATS_CA: Path to a CA certificate file on the filesystem
+        // 2. NATS_CA_CONTENTS: Certificate contents passed as environment variable
         let nats_self_signed_ca: Option<String> = std::env::var("NATS_CA").ok().or_else(|| {
             if let Ok(ca_contents) = std::env::var("NATS_CA_CONTENTS") {
+                // For NATS_CA_CONTENTS, we write the certificate to a temporary file
+                // This is useful for container deployments where the certificate
+                // content is passed as an environment variable rather than a file
                 let sanitised_nats_client_name = nats_client_name
                     .chars()
                     .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
                     .collect::<String>();
                 let tmp_file =
                     std::env::temp_dir().join(format!("rootCA-{sanitised_nats_client_name}.pem"));
-                std::fs::write(&tmp_file, ca_contents).unwrap();
-                Some(tmp_file.to_string_lossy().to_string())
+                
+                // Write the CA certificate contents to the temporary file
+                match std::fs::write(&tmp_file, ca_contents) {
+                    Ok(_) => {
+                        info!("NATS: CA certificate written to temporary file: {}", tmp_file.display());
+                        Some(tmp_file.to_string_lossy().to_string())
+                    }
+                    Err(e) => {
+                        warn!("NATS: Failed to write CA certificate to temp file: {}", e);
+                        None
+                    }
+                }
             } else {
                 None
             }
@@ -117,9 +169,14 @@ impl BevygapNats {
             .unwrap_or(3);
 
         if nats_insecure {
-            warn!("😬 NATS: insecure - TLS is disabled.");
+            warn!("😬 NATS: insecure mode - TLS verification is disabled. Not recommended for production!");
         } else {
             info!("NATS: TLS is enabled");
+            if let Some(ref ca_path) = nats_self_signed_ca {
+                info!("NATS: Using custom CA certificate for TLS verification: {}", ca_path);
+            } else {
+                info!("NATS: Using system trusted CA store for TLS verification");
+            }
         }
 
         info!("NATS: connecting as '{nats_user}' to {nats_host} with retry count: {nats_retry_count}");
@@ -142,7 +199,10 @@ impl BevygapNats {
                     .require_tls(!nats_insecure)
                     .retry_on_initial_connect();
 
+                // Configure TLS with custom root CA certificate if provided
+                // This is essential for connecting to NATS servers with self-signed certificates
                 if let Some(ref ca) = nats_self_signed_ca {
+                    info!("NATS: Adding root certificate for TLS verification: {}", ca);
                     connection_opts = connection_opts.add_root_certificates(ca.clone().into());
                 }
 
@@ -152,7 +212,12 @@ impl BevygapNats {
                         return Ok(client);
                     }
                     Err(e) => {
-                        warn!("NATS: connection failed to {} ({}): {}", host_to_try, host_description, e);
+                        warn!("NATS: TLS connection failed to {} ({}): {}", host_to_try, host_description, e);
+                        // Check if this might be a certificate verification error
+                        let error_msg = format!("{}", e);
+                        if error_msg.contains("certificate") || error_msg.contains("tls") || error_msg.contains("handshake") {
+                            warn!("NATS: TLS certificate error detected. Ensure NATS_CA or NATS_CA_CONTENTS is set for self-signed certificates.");
+                        }
                         last_error = Some(Box::new(e) as async_nats::Error);
                     }
                 }
