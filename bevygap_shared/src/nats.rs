@@ -253,7 +253,7 @@ impl BevygapNats {
     }
 
     /// Create a TLS client config from certificate contents
-    fn create_tls_client_config_from_contents(ca_contents: &str) -> Result<async_nats::rustls::ClientConfig, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn create_tls_client_config_from_contents(ca_contents: &str) -> Result<async_nats::rustls::ClientConfig, Box<dyn std::error::Error + Send + Sync>> {
         use async_nats::rustls;
         
         // Create a root certificate store
