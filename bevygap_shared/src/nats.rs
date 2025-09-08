@@ -189,7 +189,10 @@ impl BevygapNats {
     /// - `NATS_CA`: Path to CA certificate file (optional)
     /// - `NATS_CA_CONTENTS`: CA certificate contents (optional)
     /// - `NATS_INSECURE`: Disable TLS verification (optional)
-    /// - `NATSRETRYCOUNT`: Connection retry attempts, default 3 (optional)
+    /// 
+    /// ## Retry Behavior
+    /// Connection retries are handled automatically by async_nats when `retry_on_initial_connect()` is enabled.
+    /// The function will try multiple host variants (original, IPv6, IPv4) with async_nats handling retries for each.
     async fn connect_to_nats(nats_client_name: &str) -> Result<Client, async_nats::Error> {
         info!("NATS: setting up, client name: {nats_client_name}");
 
@@ -230,10 +233,6 @@ impl BevygapNats {
         let nats_host = std::env::var("NATS_HOST").expect("Missing NATS_HOST env");
         let nats_user = std::env::var("NATS_USER").expect("Missing NATS_USER env");
         let nats_pass = std::env::var("NATS_PASSWORD").expect("Missing NATS_PASSWORD env");
-        let nats_retry_count = std::env::var("NATSRETRYCOUNT")
-            .ok()
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(3);
 
         if nats_insecure {
             warn!("😬 NATS: insecure mode - TLS verification is disabled. Not recommended for production!");
@@ -246,60 +245,52 @@ impl BevygapNats {
             }
         }
 
-        info!("NATS: connecting as '{nats_user}' to {nats_host} with retry count: {nats_retry_count}");
+        info!("NATS: connecting as '{nats_user}' to {nats_host} (using async_nats retry mechanism)");
 
-        // Try the original approach first, then implement retry logic
+        // Generate multiple host variants (original, IPv6, IPv4) to try
         let hosts_to_try = Self::generate_connection_hosts(&nats_host);
         let mut last_error: Option<async_nats::Error> = None;
 
-        for retry_attempt in 0..nats_retry_count {
-            info!("NATS: connection attempt {} of {}", retry_attempt + 1, nats_retry_count);
+        // Try each host variant once - async_nats will handle retries for each host
+        for (host_description, host_to_try) in &hosts_to_try {
+            info!("NATS: trying connection to {} ({})", host_to_try, host_description);
+            
+            // Create connection options with retry_on_initial_connect enabled
+            let mut connection_opts = async_nats::ConnectOptions::new()
+                .name(nats_client_name)
+                .user_and_password(nats_user.clone(), nats_pass.clone())
+                .max_reconnects(10)
+                .require_tls(!nats_insecure)
+                .retry_on_initial_connect(); // Let async_nats handle retries
 
-            for (host_description, host_to_try) in &hosts_to_try {
-                info!("NATS: trying connection to {} ({})", host_to_try, host_description);
-                
-                // Create fresh connection options for each attempt
-                let mut connection_opts = async_nats::ConnectOptions::new()
-                    .name(nats_client_name)
-                    .user_and_password(nats_user.clone(), nats_pass.clone())
-                    .max_reconnects(10)
-                    .require_tls(!nats_insecure);
-
-                // Configure TLS with custom root CA certificate if provided
-                // This is essential for connecting to NATS servers with self-signed certificates
-                if let Some(ref ca) = nats_self_signed_ca {
-                    info!("NATS: Adding root certificate for TLS verification: {}", ca);
-                    connection_opts = connection_opts.add_root_certificates(ca.clone().into());
-                }
-
-                match connection_opts.connect(host_to_try).await {
-                    Ok(client) => {
-                        info!("🟢 NATS: connected OK to {} ({})", host_to_try, host_description);
-                        return Ok(client);
-                    }
-                    Err(e) => {
-                        warn!("NATS: TLS connection failed to {} ({}): {}", host_to_try, host_description, e);
-                        // Check if this might be a certificate verification error
-                        let error_msg = format!("{}", e);
-                        if error_msg.contains("certificate") || error_msg.contains("tls") || error_msg.contains("handshake") {
-                            warn!("NATS: TLS certificate error detected. Ensure NATS_CA or NATS_CA_CONTENTS is set for self-signed certificates.");
-                        }
-                        last_error = Some(Box::new(e) as async_nats::Error);
-                    }
-                }
+            // Configure TLS with custom root CA certificate if provided
+            // This is essential for connecting to NATS servers with self-signed certificates
+            if let Some(ref ca) = nats_self_signed_ca {
+                info!("NATS: Adding root certificate for TLS verification: {}", ca);
+                connection_opts = connection_opts.add_root_certificates(ca.clone().into());
             }
 
-            if retry_attempt < nats_retry_count - 1 {
-                let delay_ms = 1000 * (retry_attempt + 1) as u64;
-                info!("NATS: waiting {}ms before next retry", delay_ms);
-                std::thread::sleep(Duration::from_millis(delay_ms));
+            match connection_opts.connect(host_to_try).await {
+                Ok(client) => {
+                    info!("🟢 NATS: connected OK to {} ({})", host_to_try, host_description);
+                    return Ok(client);
+                }
+                Err(e) => {
+                    warn!("NATS: connection failed to {} ({}): {}", host_to_try, host_description, e);
+                    // Check if this might be a certificate verification error
+                    let error_msg = format!("{}", e);
+                    if error_msg.contains("certificate") || error_msg.contains("tls") || error_msg.contains("handshake") {
+                        warn!("NATS: TLS certificate error detected. Ensure NATS_CA or NATS_CA_CONTENTS is set for self-signed certificates.");
+                    }
+                    last_error = Some(Box::new(e) as async_nats::Error);
+                }
             }
         }
 
-        error!("NATS: all connection attempts failed after {} retries", nats_retry_count);
+        error!("NATS: all host variants failed to connect");
         // Return the last error we got, converting the type as needed
         Err(last_error.unwrap_or_else(|| {
-            let io_error = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "All connection attempts failed");
+            let io_error = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "All host variants failed to connect");
             Box::new(io_error) as async_nats::Error
         }))
     }
