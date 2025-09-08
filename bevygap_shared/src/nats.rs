@@ -139,7 +139,8 @@ impl BevygapNats {
                     .name(nats_client_name)
                     .user_and_password(nats_user.clone(), nats_pass.clone())
                     .max_reconnects(10)
-                    .require_tls(!nats_insecure);
+                    .require_tls(!nats_insecure)
+                    .retry_on_initial_connect();
 
                 if let Some(ref ca) = nats_self_signed_ca {
                     connection_opts = connection_opts.add_root_certificates(ca.clone().into());
