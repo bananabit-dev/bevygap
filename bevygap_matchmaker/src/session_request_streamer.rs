@@ -78,7 +78,14 @@ async fn stream_request_processor(
     info!("Generating streaming session for {session_request:?}");
     responder.send(SessionRequestFeedback::Acknowledged).await?;
 
-    let mut session_model = SessionModel::new(state.settings.app_name.clone());
+    // Extract game name from the client request, fall back to configured app_name if not provided
+    let app_name = session_request.obj.get("game")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&state.settings.app_name)
+        .to_string();
+
+    info!("Creating session for app: {}", app_name);
+    let mut session_model = SessionModel::new(app_name);
     session_model.ip_list = Some(vec![session_request.client_ip.to_string()]);
     session_model
         .webhook_url
